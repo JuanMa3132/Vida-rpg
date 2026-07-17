@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>VIDA RPG · Iván</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+:root{
+  --bg:#0A0F1E; --panel:#111A30; --soft:#0E1526; --line:#243354;
+  --blue:#4DA3FF; --bluedim:#2C5FA8; --gold:#F5C542; --red:#E5484D; --green:#3DD68C;
+  --purple:#A78BFA; --text:#E8EEFA; --mut:#8B96B5;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body{margin:0; background:var(--bg); color:var(--text); font-family:'Rajdhani','Segoe UI',sans-serif; padding-bottom:86px;}
+.mono{font-family:'JetBrains Mono',monospace;}
+.wrap{max-width:460px; margin:0 auto; padding:14px 12px; display:flex; flex-direction:column; gap:14px;}
+.win{position:relative; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px;}
+.win::before,.win::after{content:''; position:absolute; width:14px; height:14px; border-color:var(--blue); border-style:solid;}
+.win::before{top:-1px; left:-1px; border-width:2px 0 0 2px; border-radius:10px 0 0 0;}
+.win::after{bottom:-1px; right:-1px; border-width:0 2px 2px 0; border-radius:0 0 10px 0;}
+.tag{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; color:var(--blue);}
+.bar{height:8px; border-radius:99px; background:#1B2440; overflow:hidden;}
+.fill{height:100%; border-radius:99px; transition:width .5s cubic-bezier(.2,.8,.2,1);}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
+.card{background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:10px;}
+button{font-family:inherit;}
+.act{all:unset; background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:10px; cursor:pointer; display:block; color:var(--text);}
+.act:active{transform:scale(.96);}
+.act:disabled{opacity:.4;}
+.l{font-size:13px; font-weight:600; line-height:1.2;}
+.x{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gold); margin-top:3px;}
+.rowflex{display:flex; justify-content:space-between; align-items:center;}
+input,select,textarea{background:var(--soft); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 10px; font-size:14px; font-family:inherit;}
+input:focus,select:focus,textarea:focus{outline:1px solid var(--blue);}
+#toast{position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:60; background:var(--panel); padding:8px 16px; border-radius:8px; font-weight:700; font-size:14px; font-family:'JetBrains Mono',monospace; display:none; animation:rise .25s ease-out; max-width:88vw; text-align:center;}
+@keyframes rise{from{opacity:0; transform:translate(-50%,8px);} to{opacity:1; transform:translate(-50%,0);}}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+.shake{animation:shake .3s ease;}
+.quest{all:unset; display:flex; gap:8px; align-items:flex-start; background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:10px; cursor:pointer; width:100%; color:var(--text);}
+.quest.done{background:#10281F; border-color:var(--green); cursor:default;}
+.quest.done .qt{text-decoration:line-through; color:var(--mut);}
+.qt{font-size:13px; line-height:1.35;}
+.qxp{font-family:'JetBrains Mono',monospace; color:var(--gold); font-size:10px;}
+.logline{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mut); line-height:1.6;}
+.logline:first-child{color:var(--text);}
+h1{font-size:24px; font-weight:700; margin:0;}
+.tabs{position:fixed; bottom:0; left:0; right:0; z-index:50; background:rgba(10,15,30,.96); border-top:1px solid var(--line); display:flex; padding:6px 8px calc(10px + env(safe-area-inset-bottom)); backdrop-filter:blur(8px);}
+.tab{all:unset; flex:1; text-align:center; padding:8px 4px; cursor:pointer; color:var(--mut); font-weight:700; font-size:12px; letter-spacing:1px; border-radius:8px;}
+.tab.on{color:var(--blue); background:#14203C;}
+.tab .ic{font-size:19px; display:block;}
+.page{display:none;} .page.on{display:flex; flex-direction:column; gap:14px;}
+.avatarBox{font-size:56px; line-height:1; text-align:center; padding:8px 0;}
+.equipRow{display:flex; gap:6px; justify-content:center; font-size:22px; margin-top:2px; min-height:28px;}
+.combatLog{background:#0A1122; border:1px solid var(--line); border-radius:8px; padding:10px; height:130px; overflow-y:auto; display:flex; flex-direction:column-reverse;}
+.cl{font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7;}
+.hpnum{font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700;}
+.faceBtn{all:unset; font-size:30px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); cursor:pointer; background:var(--soft);}
+.faceBtn.on{border-color:var(--gold); background:#241F0E;}
+.shopItem{display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:10px;}
+.shopItem.owned{border-color:var(--green);}
+.shopItem.equipped{border-color:var(--gold); background:#241F0E;}
+.buyBtn{all:unset; background:var(--blue); color:#04101F; font-weight:700; border-radius:8px; padding:7px 12px; cursor:pointer; font-size:12px; white-space:nowrap;}
+.buyBtn.sec{background:var(--soft); color:var(--text); border:1px solid var(--line);}
+.buyBtn:disabled{opacity:.4;}
+@media (prefers-reduced-motion: reduce){ .fill,.act,#toast,.shake{transition:none; animation:none;} }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="wrap">
+
+<!-- ═══════════ PÁGINA: ESTADO ═══════════ -->
+<div class="page on" id="page-estado">
+  <div class="win">
+    <div class="tag">[ VENTANA DE ESTADO ]</div>
+    <div class="rowflex" style="align-items:flex-start; margin-top:4px;">
+      <div style="flex:1;">
+        <h1 id="pname">IVÁN</h1>
+        <div id="title" style="color:var(--gold); font-weight:600; font-size:15px;"></div>
+        <div style="color:var(--mut); font-size:12px;">Clase: Vigilante → Developer</div>
+        <div class="mono" style="font-size:12px; color:var(--gold); margin-top:6px;">🪙 <span id="oroTop"></span> oro · 🧪 x<span id="potTop"></span></div>
+      </div>
+      <div style="text-align:center;">
+        <div class="avatarBox" id="avatarBig">🧑🏻</div>
+        <div class="equipRow" id="equipRow"></div>
+        <div class="mono" style="font-size:11px; color:var(--mut);">NIVEL <span id="totalLvl" style="color:var(--blue); font-weight:700; font-size:16px;"></span></div>
+      </div>
+    </div>
+    <div id="nextTitle" style="color:var(--mut); font-size:12px; margin-top:6px;"></div>
+  </div>
+
+  <div class="win">
+    <div class="tag">[ ATRIBUTOS ]</div>
+    <div class="grid2" id="statsGrid"></div>
+    <div style="color:var(--mut); font-size:11px; margin-top:10px; line-height:1.5;">⚡ Tus atributos de vida REAL alimentan tu poder de combate: CUERPO=HP · DEV=ataque · FINANZAS=defensa · ENGLISH=crítico · SENA=esquiva · CONTENIDO=+oro</div>
+  </div>
+
+  <div class="win">
+    <div class="tag">[ REGISTRAR ACCIÓN ]</div>
+    <div class="grid2" id="actionsGrid"></div>
+  </div>
+
+  <div class="win">
+    <div class="tag" style="color:var(--red);">[ RAID · LA DEUDA ]</div>
+    <div class="rowflex" style="margin-top:6px;">
+      <span style="font-size:13px; color:var(--mut);">HP total restante</span>
+      <span id="debtLeft" class="mono" style="font-weight:700; color:var(--red);"></span>
+    </div>
+    <div class="bar" style="height:10px; margin-top:4px;"><div id="debtFill" class="fill" style="background:linear-gradient(90deg,#B2383C,var(--red));"></div></div>
+    <div id="dmgTotal" class="mono" style="font-size:10px; color:var(--green); margin-top:4px;"></div>
+    <div id="bossList" style="display:flex; flex-direction:column; gap:10px; margin-top:12px;"></div>
+    <div style="border-top:1px dashed var(--line); margin-top:12px; padding-top:12px;">
+      <div class="mono" style="font-size:11px; color:var(--mut); margin-bottom:6px;">REGISTRAR ABONO (ataque real · da oro ×2)</div>
+      <div style="display:flex; gap:8px;">
+        <select id="bossSel" style="flex:0 0 42%; min-width:0;"></select>
+        <input id="dmgAmt" inputmode="numeric" placeholder="$ monto" class="mono" style="flex:1; min-width:0;">
+        <button class="act" style="background:var(--red); color:#fff; font-weight:700; padding:9px 14px;" onclick="attackBoss()">⚔️</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="tag">[ REGISTRO DE QUESTS ]</div>
+    <div id="questList" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <input id="newQuest" placeholder="Nueva quest…" style="flex:1; min-width:0;">
+      <select id="newQuestStat" style="flex:0 0 62px;"></select>
+      <button class="act" style="background:var(--blue); color:#04101F; font-weight:700; padding:9px 14px;" onclick="addQuest()">+</button>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="tag">[ BITÁCORA ]</div>
+    <div id="logList" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="win">
+    <div class="tag">[ PARTIDA ]</div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button class="act" style="flex:1; text-align:center;" onclick="exportSave()">📤 Exportar</button>
+      <button class="act" style="flex:1; text-align:center;" onclick="importSave()">📥 Importar</button>
+      <button class="act" style="flex:1; text-align:center; color:var(--mut);" onclick="resetGame()">↺ Reiniciar</button>
+    </div>
+    <textarea id="saveBox" placeholder="Aquí aparece tu código de partida al exportar. Para importar: pega tu código aquí y toca Importar." style="width:100%; margin-top:10px; height:70px; font-size:11px;" class="mono"></textarea>
+  </div>
+</div>
+
+<!-- ═══════════ PÁGINA: LA TORRE ═══════════ -->
+<div class="page" id="page-torre">
+  <div class="win">
+    <div class="tag" style="color:var(--purple);">[ LA TORRE · MAZMORRA ]</div>
+    <div class="rowflex" style="margin-top:4px;">
+      <div>
+        <div style="font-size:20px; font-weight:700;">Piso <span id="pisoNum"></span></div>
+        <div id="pisoRecord" class="mono" style="font-size:11px; color:var(--mut);"></div>
+      </div>
+      <div class="mono" style="text-align:right; font-size:12px; color:var(--gold);">🪙 <span id="oroTorre"></span><br>🧪 x<span id="potTorre"></span></div>
+    </div>
+    <div id="combatArea" style="margin-top:12px;"></div>
+  </div>
+  <div class="win">
+    <div class="tag">[ TU PODER DE COMBATE ]</div>
+    <div id="combatStats" class="grid2" style="margin-top:8px;"></div>
+    <div style="color:var(--mut); font-size:11px; margin-top:8px;">Para subir estos números: vive tu vida real y registra el XP en ESTADO. La Torre no da XP de atributos — da oro y gloria.</div>
+  </div>
+</div>
+
+<!-- ═══════════ PÁGINA: EQUIPO ═══════════ -->
+<div class="page" id="page-equipo">
+  <div class="win">
+    <div class="tag">[ PERSONAJE ]</div>
+    <div class="avatarBox" id="avatarBig2">🧑🏻</div>
+    <div class="equipRow" id="equipRow2"></div>
+    <div style="text-align:center; color:var(--mut); font-size:12px; margin-top:4px;">Elige tu aspecto:</div>
+    <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:8px;" id="faceRow"></div>
+  </div>
+  <div class="win">
+    <div class="tag" style="color:var(--gold);">[ TIENDA & ARSENAL ]</div>
+    <div class="mono" style="font-size:12px; color:var(--gold); margin-top:4px;">🪙 <span id="oroShop"></span> oro disponible</div>
+    <div style="color:var(--mut); font-size:11px; margin-top:2px;">El oro se gana en La Torre y con abonos reales a la deuda.</div>
+    <div id="shopPotion" style="margin-top:10px;"></div>
+    <div id="shopList" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+  </div>
+</div>
+
+</div>
+
+<!-- NAV -->
+<nav class="tabs">
+  <button class="tab on" data-p="estado" onclick="goTab('estado')"><span class="ic">📜</span>ESTADO</button>
+  <button class="tab" data-p="torre" onclick="goTab('torre')"><span class="ic">🗼</span>LA TORRE</button>
+  <button class="tab" data-p="equipo" onclick="goTab('equipo')"><span class="ic">🛡️</span>EQUIPO</button>
+</nav>
+
+<script>
+const KEY='vida-rpg-v1';
+const STATS=[
+  {id:'dev',name:'DEV',icon:'💻',desc:'Código real → ATAQUE'},
+  {id:'english',name:'ENGLISH',icon:'🗣️',desc:'Rumbo a B2 → CRÍTICO'},
+  {id:'finanzas',name:'FINANZAS',icon:'💰',desc:'Control → DEFENSA'},
+  {id:'sena',name:'SENA',icon:'🎓',desc:'Disciplina → ESQUIVA'},
+  {id:'cuerpo',name:'CUERPO',icon:'💪',desc:'Hardware → HP'},
+  {id:'contenido',name:'CONTENIDO',icon:'🎬',desc:'Carisma → +ORO'},
+];
+const ACTIONS=[
+  {stat:'dev',label:'1h de código real',xp:30},
+  {stat:'dev',label:'Oficio terminado',xp:150},
+  {stat:'english',label:'Sesión inglés / Anki',xp:25},
+  {stat:'english',label:'Video hablando inglés',xp:40},
+  {stat:'sena',label:'Evidencia entregada',xp:60},
+  {stat:'cuerpo',label:'Entrenar / caminar',xp:25},
+  {stat:'contenido',label:'Grabar / editar clip',xp:35},
+  {stat:'finanzas',label:'Día sin gasto impulsivo',xp:15},
+];
+const FACES=['🧑🏻','🧔🏻','🥷','🤖','🐺','🦅','👾','🫡'];
+const ITEMS=[
+  {id:'w1',slot:'arma',ic:'🔦',name:'Linterna de ronda',b:{atk:2},p:40},
+  {id:'w2',slot:'arma',ic:'🗝️',name:'Llavero maestro',b:{atk:4,crit:2},p:90},
+  {id:'w3',slot:'arma',ic:'⌨️',name:'Teclado mecánico',b:{atk:7,crit:3},p:180},
+  {id:'w4',slot:'arma',ic:'⚔️',name:'Espada del Deploy',b:{atk:12,crit:5},p:400},
+  {id:'a1',slot:'ropa',ic:'🦺',name:'Chaleco reflectivo',b:{def:3},p:50},
+  {id:'a2',slot:'ropa',ic:'🧥',name:'Hoodie de dev',b:{def:5,hp:20},p:120},
+  {id:'a3',slot:'ropa',ic:'🧤',name:'Gabán bogotano',b:{def:8,hp:35},p:250},
+  {id:'a4',slot:'ropa',ic:'🛡️',name:'Armadura Full-Stack',b:{def:12,hp:60},p:500},
+  {id:'t1',slot:'objeto',ic:'☕',name:'Termo de café',b:{hp:25},p:60},
+  {id:'t2',slot:'objeto',ic:'🎧',name:'Audífonos de turno',b:{dodge:4},p:100},
+  {id:'t3',slot:'objeto',ic:'🥽',name:'Gafas VR',b:{dodge:5,crit:4},p:220},
+  {id:'t4',slot:'objeto',ic:'💍',name:'Anillo del Interés Compuesto',b:{gold:20},p:350},
+];
+const MINIONS=['Rata de la Estación 11','Duende del Gasto Hormiga','Colado del Torniquete','Bug de Producción','Zombi del Turno Doble','Interés Corriente','Notificación Infinita','Mosquito de Madrugada','Papeleo Fantasma','Antojo de Rappi'];
+const MICONS=['🐀','👺','🚷','🐛','🧟','🩸','🔔','🦟','📄','🍔'];
+const BOSSNAMES=['SEÑOR MORA','EL ALGORITMO','LA PROCRASTINACIÓN','EL BURNOUT','RECLUTADOR MLM SUPREMO','EL YO DEL PASADO'];
+const BICONS=['🧛','🌀','🦥','🔥','🐍','🪞'];
+const TITLES=[[0,'Vigilante Nocturno'],[6,'Aprendiz del Sistema'],[12,'Cazador de Deudas'],[18,'Forjador de Código'],[26,'Dev en Ascenso'],[36,'Leyenda de Dos Mundos']];
+const INIT={
+  stats:{dev:0,english:0,finanzas:0,sena:0,cuerpo:0,contenido:0},
+  bosses:[
+    {id:'mj',name:'MASTER JOVEN',sub:'Boss nv.1 · muere ~20 AGO',hpMax:695510,hp:695510,dead:false},
+    {id:'bdb',name:'BANCO DE BOGOTÁ',sub:'Boss nv.2 · muere ~5 SEP',hpMax:933784,hp:933784,dead:false},
+    {id:'nu',name:'NU',sub:'Boss nv.3 · muere ~20 SEP',hpMax:886642,hp:886642,dead:false},
+    {id:'vg',name:'VISA GOLD',sub:'BOSS FINAL · muere ~20 DIC',hpMax:7511227,hp:7511227,dead:false},
+  ],
+  quests:[
+    {id:1,text:'⚔️ QUEST LEGENDARIA: hablar con el instructor (nivelación + etapa productiva)',stat:'sena',xp:200,done:false},
+    {id:2,text:'Oficio 1: CRUD de consola en Java, terminado y subido a GitHub',stat:'dev',xp:150,done:false},
+    {id:3,text:'Auditar suscripciones (Apple, Claude, Smart Fit): matar o pasar a débito',stat:'finanzas',xp:80,done:false},
+    {id:4,text:'Cotizar cambio de glass en 2-3 sitios',stat:'finanzas',xp:40,done:false},
+    {id:5,text:'Primer abono del plan (20 de julio)',stat:'finanzas',xp:60,done:false},
+    {id:6,text:'Unirme a un Discord/comunidad dev y presentarme',stat:'dev',xp:50,done:false},
+  ],
+  log:[],totalAbonado:0,created:Date.now(),
+  oro:30,potions:1,piso:1,record:1,face:'🧑🏻',owned:[],equip:{arma:null,ropa:null,objeto:null},
+};
+
+let S;
+try{
+  const raw=JSON.parse(localStorage.getItem(KEY));
+  S=raw?Object.assign(structuredClone(INIT),raw):structuredClone(INIT);
+  S.equip=Object.assign({arma:null,ropa:null,objeto:null},S.equip||{});
+  S.owned=S.owned||[];
+}catch(e){S=structuredClone(INIT);}
+
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function fmt(n){return '$'+Math.max(0,Math.round(n)).toLocaleString('es-CO');}
+function lvl(xp){let l=0,r=xp,c=100;while(r>=c){r-=c;l++;c=100+l*40;}return{l,into:r,need:c};}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+let toastT;
+function toast(txt,color){const t=document.getElementById('toast');t.textContent=txt;t.style.color=color;t.style.border='1px solid '+color;t.style.boxShadow='0 0 18px '+color+'44';t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2000);}
+function addLog(e){S.log.unshift({ts:Date.now(),e});S.log=S.log.slice(0,25);}
+
+// ── poder de combate derivado de la VIDA REAL ──
+function power(){
+  const L={};STATS.forEach(t=>L[t.id]=lvl(S.stats[t.id]).l);
+  let p={hp:100+L.cuerpo*20,atk:8+L.dev*3,def:L.finanzas*2,crit:5+L.english*2,dodge:2+Math.round(L.sena*1.5),gold:L.contenido*5};
+  ['arma','ropa','objeto'].forEach(sl=>{
+    const it=ITEMS.find(i=>i.id===S.equip[sl]); if(!it)return;
+    Object.entries(it.b).forEach(([k,v])=>p[k]=(p[k]||0)+v);
+  });
+  return p;
+}
+
+// ── COMBATE ──
+let C=null; // {e:{name,ic,hp,hpMax,atk,def,boss}, php, cool, over}
+function enemyFor(f){
+  const boss=f%5===0;
+  const cycle=Math.floor((f-1)/1);
+  let name,ic;
+  if(boss){const bi=(f/5-1)%BOSSNAMES.length;name=BOSSNAMES[bi];ic=BICONS[bi];}
+  else{const mi=(f+Math.floor(f/5))%MINIONS.length;name=MINIONS[mi];ic=MICONS[mi];}
+  const m=boss?1.8:1;
+  return {name,ic,boss,hpMax:Math.round((40+f*22)*m),hp:Math.round((40+f*22)*m),atk:Math.round((6+f*4)*m),def:Math.round(f*1.5*m)};
+}
+function startFight(){
+  C={e:enemyFor(S.piso),php:power().hp,cool:0,over:false,lines:[]};
+  clog('Piso '+S.piso+': aparece '+C.e.name+' '+C.e.ic+(C.e.boss?' — ¡¡BOSS!!':''));
+  renderTorre();
+}
+function clog(t){if(!C)return;C.lines.unshift(t);C.lines=C.lines.slice(0,40);}
+function dmgCalc(atk,def,critPct){
+  let d=Math.max(1,atk-def*0.6);
+  d=d*(0.85+Math.random()*0.3);
+  const crit=Math.random()*100<critPct;
+  if(crit)d*=1.7;
+  return {d:Math.round(d),crit};
+}
+function enemyTurn(){
+  if(!C||C.over)return;
+  const p=power();
+  if(Math.random()*100<p.dodge){clog('💨 ¡Esquivaste el ataque de '+C.e.name+'!');return;}
+  const {d}=dmgCalc(C.e.atk,p.def,5);
+  C.php=Math.max(0,C.php-d);
+  clog('💥 '+C.e.name+' te golpea: −'+d+' HP');
+  if(C.php<=0){
+    C.over=true;
+    const fine=Math.round(S.oro*0.2);
+    S.oro-=fine;
+    clog('☠️ Caíste… La Torre te expulsa. Pierdes '+fine+' oro. (Tu piso se conserva)');
+    addLog('☠️ Derrotado en el piso '+S.piso+' de La Torre por '+C.e.name);
+    save();
+  }
+}
+function pAttack(skill){
+  if(!C||C.over)return;
+  const p=power();
+  if(skill&&C.cool>0)return;
+  const mult=skill?1.6:1;
+  const {d,crit}=dmgCalc(p.atk*mult,C.e.def,p.crit);
+  C.e.hp=Math.max(0,C.e.hp-d);
+  clog((skill?'⚡ TURNO EXTRA: ':'🗡️ Atacas: ')+'−'+d+' HP'+(crit?' ¡CRÍTICO!':''));
+  if(skill)C.cool=3;else if(C.cool>0)C.cool--;
+  if(C.e.hp<=0){
+    C.over=true;
+    const base=(15+S.piso*8)*(C.e.boss?2.5:1);
+    const gold=Math.round(base*(1+p.gold/100));
+    S.oro+=gold;
+    clog('🎉 ¡'+C.e.name+' derrotado! +'+gold+' oro');
+    addLog('🏆 Piso '+S.piso+' superado: '+C.e.name+' (+'+gold+' oro)');
+    if(C.e.boss)clog('👑 ¡Boss de la Torre caído! Checkpoint guardado.');
+    S.piso++;S.record=Math.max(S.record,S.piso);
+    save();
+  } else enemyTurn();
+  renderTorre();renderTop();
+}
+function usePotion(){
+  if(!C||C.over||S.potions<=0)return;
+  const p=power();
+  const heal=Math.round(p.hp*0.4);
+  S.potions--;C.php=Math.min(p.hp,C.php+heal);
+  clog('🧪 Poción: +'+heal+' HP');
+  enemyTurn();save();renderTorre();renderTop();
+}
+function flee(){
+  if(!C||C.over)return;
+  if(Math.random()<0.7){clog('🏃 Escapaste con la dignidad intacta.');C.over=true;C.fled=true;}
+  else{clog('🚫 ¡No pudiste huir!');enemyTurn();}
+  renderTorre();
+}
+
+// ── VIDA REAL ──
+function gainXp(statId,xp,label){
+  S.stats[statId]+=xp;
+  addLog('+'+xp+' '+statId.toUpperCase()+' · '+label);
+  save();renderAll();
+  toast('+'+xp+' XP '+STATS.find(t=>t.id===statId).icon,'var(--gold)');
+}
+function attackBoss(){
+  const sel=document.getElementById('bossSel').value;
+  const raw=document.getElementById('dmgAmt').value.replace(/[^\d]/g,'');
+  const amt=parseInt(raw,10);
+  if(!amt||amt<=0)return;
+  const b=S.bosses.find(x=>x.id===sel);if(!b||b.dead)return;
+  b.hp=Math.max(0,b.hp-amt);
+  const killed=b.hp<=0;if(killed)b.dead=true;
+  const xp=Math.round(amt/10000)+(killed?100:0);
+  const gold=Math.round(amt/5000)+(killed?200:0);
+  S.stats.finanzas+=xp;S.totalAbonado+=amt;S.oro+=gold;
+  addLog(killed?'☠️ BOSS REAL DERROTADO: '+b.name+' · golpe final '+fmt(amt)+' (+'+gold+' oro)':'⚔️ '+fmt(amt)+' a '+b.name+' (+'+xp+' FIN, +'+gold+' oro)');
+  document.getElementById('dmgAmt').value='';
+  save();renderAll();
+  toast(killed?'☠️ ¡BOSS REAL DERROTADO! +'+gold+' 🪙':'⚔️ −'+fmt(amt)+' HP · +'+gold+' 🪙',killed?'var(--green)':'var(--red)');
+}
+function toggleQuest(id){
+  const q=S.quests.find(x=>x.id===id);
+  if(!q||q.done)return;
+  q.done=true;S.stats[q.stat]+=q.xp;S.oro+=25;
+  addLog('✅ Quest cumplida (+'+q.xp+' '+q.stat.toUpperCase()+', +25 oro)');
+  save();renderAll();
+  toast('✅ Quest +'+q.xp+' XP +25 🪙','var(--green)');
+}
+function addQuest(){
+  const inp=document.getElementById('newQuest');
+  const t=inp.value.trim();if(!t)return;
+  S.quests.push({id:Date.now(),text:t,stat:document.getElementById('newQuestStat').value,xp:60,done:false});
+  inp.value='';save();renderAll();
+}
+
+// ── TIENDA ──
+function buyItem(id){
+  const it=ITEMS.find(i=>i.id===id);
+  if(!it||S.owned.includes(id)||S.oro<it.p)return;
+  S.oro-=it.p;S.owned.push(id);S.equip[it.slot]=id;
+  addLog('🛒 Compraste '+it.name+' (−'+it.p+' oro)');
+  save();renderAll();toast('🛒 '+it.ic+' ¡Equipado!','var(--gold)');
+}
+function equipItem(id){
+  const it=ITEMS.find(i=>i.id===id);if(!it)return;
+  S.equip[it.slot]=S.equip[it.slot]===id?null:id;
+  save();renderAll();
+}
+function buyPotion(){
+  if(S.oro<30)return;
+  S.oro-=30;S.potions++;save();renderAll();toast('🧪 +1 poción','var(--green)');
+}
+function setFace(f){S.face=f;save();renderAll();}
+
+// ── PARTIDA ──
+function exportSave(){
+  const code=btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  const box=document.getElementById('saveBox');
+  box.value=code;box.select();
+  try{document.execCommand('copy');toast('📤 Código copiado. Guárdalo en tus notas.','var(--blue)');}
+  catch(e){toast('📤 Código generado. Cópialo manual.','var(--blue)');}
+}
+function importSave(){
+  const v=document.getElementById('saveBox').value.trim();
+  if(!v){toast('Pega tu código en la caja primero','var(--red)');return;}
+  try{
+    const data=JSON.parse(decodeURIComponent(escape(atob(v))));
+    if(!data.stats)throw 0;
+    S=Object.assign(structuredClone(INIT),data);
+    save();renderAll();toast('📥 Partida restaurada','var(--green)');
+  }catch(e){toast('⚠ Código inválido','var(--red)');}
+}
+function resetGame(){
+  if(!confirm('¿Reiniciar TODA la partida? Se pierde el progreso.'))return;
+  S=structuredClone(INIT);save();renderAll();
+}
+
+// ── NAVEGACIÓN ──
+function goTab(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
+  document.getElementById('page-'+p).classList.add('on');
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.p===p));
+  window.scrollTo(0,0);
+  if(p==='torre'&&(!C||C.over&&!C.e))startFightIfNone();
+  renderAll();
+}
+function startFightIfNone(){if(!C)startFight();}
+
+// ── RENDER ──
+function equipIcons(){return ['arma','ropa','objeto'].map(sl=>{const it=ITEMS.find(i=>i.id===S.equip[sl]);return it?it.ic:'·';}).join(' ');}
+function renderTop(){
+  document.getElementById('oroTop').textContent=S.oro;
+  document.getElementById('potTop').textContent=S.potions;
+  const ot=document.getElementById('oroTorre');if(ot)ot.textContent=S.oro;
+  const pt=document.getElementById('potTorre');if(pt)pt.textContent=S.potions;
+  const os=document.getElementById('oroShop');if(os)os.textContent=S.oro;
+}
+function renderEstado(){
+  const L={};STATS.forEach(t=>L[t.id]=lvl(S.stats[t.id]));
+  const total=Object.values(L).reduce((a,b)=>a+b.l,0);
+  document.getElementById('totalLvl').textContent=total;
+  document.getElementById('title').textContent=TITLES.filter(x=>total>=x[0]).pop()[1];
+  const nt=TITLES.find(x=>total<x[0]);
+  document.getElementById('nextTitle').innerHTML=nt?('Próximo título a nivel '+nt[0]+': <span style="color:var(--text)">'+nt[1]+'</span>'):'Título máximo. GG, leyenda.';
+  document.getElementById('avatarBig').textContent=S.face;
+  document.getElementById('equipRow').textContent=equipIcons();
+
+  document.getElementById('statsGrid').innerHTML=STATS.map(t=>{
+    const x=L[t.id];
+    return '<div class="card"><div class="rowflex"><span style="font-weight:700;font-size:14px;">'+t.icon+' '+t.name+'</span><span class="mono" style="color:var(--gold);font-weight:700;font-size:14px;">Nv.'+x.l+'</span></div>'
+    +'<div class="bar" style="margin-top:8px;"><div class="fill" style="width:'+(x.into/x.need*100)+'%;background:linear-gradient(90deg,var(--gold),#FFDF8E);"></div></div>'
+    +'<div class="mono" style="font-size:10px;color:var(--mut);margin-top:4px;">'+x.into+'/'+x.need+' XP · '+t.desc+'</div></div>';
+  }).join('');
+
+  document.getElementById('actionsGrid').innerHTML=ACTIONS.map(a=>{
+    const ic=STATS.find(t=>t.id===a.stat).icon;
+    return '<button class="act" onclick="gainXp(\''+a.stat+'\','+a.xp+',\''+a.label.replace(/'/g,"\\'")+'\')"><div class="l">'+ic+' '+a.label+'</div><div class="x">+'+a.xp+' XP</div></button>';
+  }).join('');
+
+  const left=S.bosses.reduce((a,b)=>a+b.hp,0),max=S.bosses.reduce((a,b)=>a+b.hpMax,0);
+  document.getElementById('debtLeft').textContent=fmt(left);
+  document.getElementById('debtFill').style.width=(left/max*100)+'%';
+  document.getElementById('dmgTotal').textContent='Daño total infligido: '+fmt(S.totalAbonado)+' · Victoria proyectada: 20 DIC 2026';
+  document.getElementById('bossList').innerHTML=S.bosses.map(b=>
+    '<div class="card" style="opacity:'+(b.dead?.55:1)+';border-color:'+(b.dead?'var(--green)':'var(--line)')+';">'
+    +'<div class="rowflex"><span style="font-weight:700;font-size:14px;'+(b.dead?'text-decoration:line-through;':'')+'">'+(b.dead?'☠️ ':'🃏 ')+b.name+'</span>'
+    +'<span class="mono" style="font-size:12px;font-weight:700;color:'+(b.dead?'var(--green)':'var(--red)')+';">'+(b.dead?'DERROTADO':fmt(b.hp))+'</span></div>'
+    +'<div class="bar" style="margin-top:8px;"><div class="fill" style="width:'+(b.hp/b.hpMax*100)+'%;background:'+(b.dead?'var(--green)':'linear-gradient(90deg,#8E2F33,var(--red))')+';"></div></div>'
+    +'<div class="mono" style="font-size:10px;color:var(--mut);margin-top:4px;">'+b.sub+'</div></div>'
+  ).join('');
+  document.getElementById('bossSel').innerHTML=S.bosses.filter(b=>!b.dead).map(b=>'<option value="'+b.id+'">'+b.name+'</option>').join('')||'<option>—</option>';
+
+  document.getElementById('questList').innerHTML=S.quests.map(q=>
+    '<button class="quest'+(q.done?' done':'')+'" onclick="toggleQuest('+q.id+')"><span style="font-size:15px;">'+(q.done?'✅':'⬜')+'</span>'
+    +'<span class="qt">'+esc(q.text)+' <span class="qxp">+'+q.xp+' '+q.stat.toUpperCase()+'</span></span></button>'
+  ).join('');
+  const nqs=document.getElementById('newQuestStat');
+  if(!nqs.options.length)nqs.innerHTML=STATS.map(t=>'<option value="'+t.id+'">'+t.icon+'</option>').join('');
+
+  document.getElementById('logList').innerHTML=S.log.length===0
+    ?'<div style="color:var(--mut);font-size:13px;">Aún no hay registros. Toca una acción y empieza a farmear XP.</div>'
+    :S.log.map(l=>'<div class="logline"><span style="color:var(--bluedim);">'+new Date(l.ts).toLocaleDateString('es-CO',{day:'2-digit',month:'short'})+'</span> · '+esc(l.e)+'</div>').join('');
+}
+function renderTorre(){
+  document.getElementById('pisoNum').textContent=S.piso;
+  document.getElementById('pisoRecord').textContent='Récord: piso '+S.record;
+  const p=power();
+  document.getElementById('combatStats').innerHTML=[
+    ['❤️ HP máx',p.hp],['🗡️ Ataque',p.atk],['🛡️ Defensa',p.def],
+    ['🎯 Crítico',p.crit+'%'],['💨 Esquiva',p.dodge+'%'],['🪙 Bonus oro','+'+p.gold+'%']
+  ].map(x=>'<div class="card rowflex"><span style="font-size:13px;">'+x[0]+'</span><span class="mono" style="font-weight:700;color:var(--blue);">'+x[1]+'</span></div>').join('');
+
+  const area=document.getElementById('combatArea');
+  if(!C){
+    area.innerHTML='<button class="act" style="text-align:center;background:var(--purple);color:#120A24;font-weight:700;font-size:15px;padding:14px;" onclick="startFight()">🗼 ENTRAR AL PISO '+S.piso+'</button>';
+    return;
+  }
+  if(C.over){
+    area.innerHTML='<div class="combatLog">'+C.lines.map(l=>'<div class="cl">'+esc(l)+'</div>').join('')+'</div>'
+    +'<button class="act" style="text-align:center;background:var(--purple);color:#120A24;font-weight:700;font-size:15px;padding:14px;margin-top:10px;" onclick="startFight()">'+(C.fled||C.php<=0?'🔁 Reintentar piso '+S.piso:'⬆️ Subir al piso '+S.piso)+'</button>';
+    return;
+  }
+  const php=Math.max(0,C.php),pmax=p.hp;
+  area.innerHTML=
+   '<div class="card"><div class="rowflex"><span style="font-size:15px;font-weight:700;">'+C.e.ic+' '+esc(C.e.name)+(C.e.boss?' 👑':'')+'</span><span class="hpnum" style="color:var(--red);">'+C.e.hp+'/'+C.e.hpMax+'</span></div>'
+   +'<div class="bar" style="margin-top:6px;"><div class="fill" style="width:'+(C.e.hp/C.e.hpMax*100)+'%;background:linear-gradient(90deg,#8E2F33,var(--red));"></div></div></div>'
+   +'<div class="card" style="margin-top:8px;"><div class="rowflex"><span style="font-size:15px;font-weight:700;">'+S.face+' TÚ '+equipIcons()+'</span><span class="hpnum" style="color:var(--green);">'+php+'/'+pmax+'</span></div>'
+   +'<div class="bar" style="margin-top:6px;"><div class="fill" style="width:'+(php/pmax*100)+'%;background:linear-gradient(90deg,#1E7A52,var(--green));"></div></div></div>'
+   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">'
+   +'<button class="act" style="text-align:center;font-weight:700;" onclick="pAttack(false)">🗡️ Atacar</button>'
+   +'<button class="act" style="text-align:center;font-weight:700;" '+(C.cool>0?'disabled':'')+' onclick="pAttack(true)">⚡ Doble turno'+(C.cool>0?' ('+C.cool+')':'')+'</button>'
+   +'<button class="act" style="text-align:center;" '+(S.potions<=0?'disabled':'')+' onclick="usePotion()">🧪 Poción ('+S.potions+')</button>'
+   +'<button class="act" style="text-align:center;color:var(--mut);" onclick="flee()">🏃 Huir</button></div>'
+   +'<div class="combatLog" style="margin-top:10px;">'+C.lines.map(l=>'<div class="cl">'+esc(l)+'</div>').join('')+'</div>';
+}
+function renderEquipo(){
+  document.getElementById('avatarBig2').textContent=S.face;
+  document.getElementById('equipRow2').textContent=equipIcons();
+  document.getElementById('faceRow').innerHTML=FACES.map(f=>'<button class="faceBtn'+(S.face===f?' on':'')+'" onclick="setFace(\''+f+'\')">'+f+'</button>').join('');
+  document.getElementById('shopPotion').innerHTML='<div class="shopItem"><div><div class="l">🧪 Poción (cura 40% HP)</div><div class="x">Consumible · tienes x'+S.potions+'</div></div><button class="buyBtn" '+(S.oro<30?'disabled':'')+' onclick="buyPotion()">30 🪙</button></div>';
+  document.getElementById('shopList').innerHTML=ITEMS.map(it=>{
+    const owned=S.owned.includes(it.id),eq=S.equip[it.slot]===it.id;
+    const bon=Object.entries(it.b).map(([k,v])=>({atk:'🗡️',def:'🛡️',hp:'❤️',crit:'🎯',dodge:'💨',gold:'🪙'}[k]+'+'+v+(k==='gold'?'%':''))).join(' ');
+    let btn;
+    if(eq)btn='<button class="buyBtn sec" onclick="equipItem(\''+it.id+'\')">Quitar</button>';
+    else if(owned)btn='<button class="buyBtn" onclick="equipItem(\''+it.id+'\')">Equipar</button>';
+    else btn='<button class="buyBtn" '+(S.oro<it.p?'disabled':'')+' onclick="buyItem(\''+it.id+'\')">'+it.p+' 🪙</button>';
+    return '<div class="shopItem'+(eq?' equipped':owned?' owned':'')+'"><div><div class="l">'+it.ic+' '+esc(it.name)+'</div><div class="x">'+it.slot.toUpperCase()+' · '+bon+'</div></div>'+btn+'</div>';
+  }).join('');
+}
+function renderAll(){renderTop();renderEstado();renderTorre();renderEquipo();}
+renderAll();
+</script>
+</body>
+</html>
