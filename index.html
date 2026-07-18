@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIDA RPG — Pixel Quest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+        * { border-radius: 0 !important; }
+        body {
+            font-family: 'VT323', monospace;
+            font-size: 19px;
+            background-color: #0D0F1A;
+            color: #E8EAF6;
+            image-rendering: pixelated;
+        }
+        .font-px { font-family: 'Press Start 2P', monospace; }
+
+        /* scanlines CRT */
+        body::after {
+            content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 500;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 2px, transparent 2px 4px);
+        }
+
+        .rpg-grid {
+            background-image:
+                linear-gradient(rgba(245, 200, 66, 0.04) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(245, 200, 66, 0.04) 2px, transparent 2px);
+            background-size: 32px 32px;
+        }
+
+        .pix {
+            background: #151828;
+            border: 3px solid #2E3450;
+            box-shadow: 0 0 0 3px #05060C, 6px 6px 0 rgba(0,0,0,.5);
+        }
+        .pix-dark { background: #0A0C17; border: 3px solid #232840; box-shadow: 0 0 0 2px #05060C; }
+
+        .pix-btn {
+            border: 3px solid #000;
+            box-shadow: 3px 3px 0 #000;
+            transition: transform .05s, box-shadow .05s;
+            font-family: 'Press Start 2P', monospace;
+            cursor: pointer;
+        }
+        .pix-btn:active { transform: translate(3px,3px); box-shadow: 0 0 0 #000; }
+        .pix-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+        .pix-bar { background: #060810; border: 2px solid #000; height: 14px; position: relative; overflow: hidden; }
+        .pix-bar.thin { height: 9px; }
+        .pix-fill {
+            height: 100%;
+            transition: width .5s steps(12);
+            background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.28) 0 2px, transparent 2px 8px);
+        }
+
+        .sprite { display: inline-block; filter: saturate(1.15) contrast(1.05); }
+        .sprite-bob { animation: bob 1s steps(2) infinite; }
+        @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+        .enemy-hit { animation: enemyHit .4s steps(4); }
+        @keyframes enemyHit {
+            0%,100% { transform: translateX(0); filter: none; }
+            25% { transform: translateX(-10px); filter: brightness(3) sepia(1) hue-rotate(-50deg); }
+            60% { transform: translateX(8px); }
+        }
+        .player-hit { animation: playerHit .35s steps(3); }
+        @keyframes playerHit {
+            0%,100% { background: transparent; }
+            40% { background: rgba(255,40,40,.22); }
+        }
+
+        .xp-float {
+            position: fixed; font-family: 'Press Start 2P', monospace; font-size: 14px;
+            pointer-events: none; z-index: 400;
+            animation: xpFloat 1.1s steps(10) forwards;
+            text-shadow: 2px 2px 0 #000;
+        }
+        @keyframes xpFloat {
+            0% { opacity: 0; transform: translateY(6px); }
+            15% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-70px); }
+        }
+
+        .levelup-rays {
+            position: absolute; inset: -60%;
+            background: repeating-conic-gradient(from 0deg, rgba(245,200,66,.10) 0deg 9deg, transparent 9deg 26deg);
+            animation: spinRays 30s steps(60) infinite;
+        }
+        @keyframes spinRays { to { transform: rotate(360deg); } }
+        .levelup-pop { animation: levelPop .5s steps(6) both; }
+        @keyframes levelPop { 0% { transform: scale(.2); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .levelup-num {
+            font-family: 'Press Start 2P', monospace;
+            color: #F5C842;
+            text-shadow: 4px 4px 0 #7A5A00, 8px 8px 0 #000;
+        }
+
+        .chest-shake { animation: chestShake .6s steps(4) infinite; }
+        @keyframes chestShake { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+        .item-reveal { animation: itemReveal .5s steps(5) both; }
+        @keyframes itemReveal { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        .boss-hit { animation: bossHit .35s steps(4); }
+        @keyframes bossHit { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 60% { transform: translateX(5px); } }
+
+        .task-done { opacity: .45; }
+        .task-done .task-name { text-decoration: line-through; }
+
+        .blink { animation: blink 1s steps(2) infinite; }
+        @keyframes blink { 50% { opacity: .25; } }
+
+        input, select { outline: none; font-family: 'VT323', monospace; font-size: 18px; }
+        input:focus, select:focus { border-color: #F5C842 !important; }
+        select option { background-color: #151828; }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #0D0F1A; }
+        ::-webkit-scrollbar-thumb { background: #2E3450; border: 2px solid #0D0F1A; }
+    </style>
+</head>
+<body class="rpg-grid min-h-screen pb-24">
+
+    <!-- ===================== HEADER / HUD ===================== -->
+    <header class="sticky top-0 z-50 bg-[#0A0C17]/95 border-b-4 border-black" style="box-shadow: 0 4px 0 rgba(0,0,0,.4)">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3">
+            <div class="flex items-center gap-x-3 sm:gap-x-4 flex-wrap gap-y-2">
+                <div class="relative cursor-pointer" onclick="showSettings()" title="Editar héroe">
+                    <div class="w-14 h-14 pix-dark flex items-center justify-center text-3xl sprite" id="hud-avatar">🦸</div>
+                    <div class="absolute -bottom-2 -right-2 min-w-[24px] h-6 px-1 bg-[#F5C842] border-2 border-black flex items-center justify-center text-black text-[10px] font-px" id="hud-rank">E</div>
+                </div>
+
+                <div class="flex-1 min-w-[190px]">
+                    <div class="flex items-baseline gap-x-2 flex-wrap">
+                        <span class="font-px text-[13px] text-white" id="hud-name">Héroe</span>
+                        <span class="text-[15px] text-[#F5C842]" id="hud-title">Novato</span>
+                    </div>
+                    <div class="flex items-center gap-x-2 mt-1.5">
+                        <span class="font-px text-[9px] text-[#8890B0] whitespace-nowrap">NV.<span class="text-white" id="hud-level">1</span></span>
+                        <div class="pix-bar flex-1 max-w-[220px]"><div class="pix-fill" id="hud-xpbar" style="width:0%; background-color:#F5C842"></div></div>
+                        <span class="text-[14px] text-[#8890B0] whitespace-nowrap" id="hud-xptext">0/100</span>
+                    </div>
+                    <div class="flex items-center gap-x-2 mt-1">
+                        <span class="text-[13px] text-red-400 w-6">HP</span>
+                        <div class="pix-bar thin flex-1 max-w-[120px]"><div class="pix-fill" id="hud-hpbar" style="width:100%; background-color:#FF4E4E"></div></div>
+                        <span class="text-[13px] text-[#4E9EFF] w-6">MP</span>
+                        <div class="pix-bar thin flex-1 max-w-[120px]"><div class="pix-fill" id="hud-mpbar" style="width:100%; background-color:#4E9EFF"></div></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-x-2 flex-wrap gap-y-2 text-[16px]">
+                    <div class="pix-dark px-2.5 py-1 flex items-center gap-x-1.5" title="Oro">🪙<span class="text-[#F5C842]" id="hud-gold">0</span></div>
+                    <div class="pix-dark px-2.5 py-1 flex items-center gap-x-1.5" title="Racha de días">🔥<span class="text-orange-400" id="hud-streak">0</span></div>
+                    <div class="pix-dark px-2.5 py-1 flex items-center gap-x-1.5" title="Energía para la mazmorra (se recarga completando misiones reales)">⚡<span class="text-[#4EFF8E]" id="hud-energy">10</span></div>
+                    <div class="pix-dark px-2.5 py-1 items-center gap-x-1.5 hidden sm:flex" title="Diarias de hoy">📅<span id="hud-today">0/0</span></div>
+                    <button onclick="toggleSound()" class="pix-btn bg-[#151828] text-[#8890B0] w-9 h-9 text-[12px]" title="Sonido" id="sound-icon">♪</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===================== MAIN ===================== -->
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 mt-7 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- ========== COLUMNA IZQUIERDA ========== -->
+        <div class="lg:col-span-2 space-y-8">
+
+            <!-- MAZMORRA -->
+            <div class="pix p-5 sm:p-6">
+                <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                    <h2 class="font-px text-[13px] text-[#C77DFF]">🏰 LA MAZMORRA</h2>
+                    <div class="text-[15px] text-[#8890B0]">Piso récord: <span class="text-white" id="dg-best">1</span></div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="pix-dark p-4 text-center">
+                        <div class="text-[14px] text-[#8890B0] font-px mb-2">PISO <span class="text-[#F5C842]" id="dg-floor">1</span></div>
+                        <div class="text-6xl sprite sprite-bob" id="dg-enemy-preview">🟢</div>
+                        <div class="text-[16px] mt-2" id="dg-enemy-name">???</div>
+                        <div class="text-[14px] text-[#8890B0]" id="dg-kills">Victorias en este piso: 0/3</div>
+                    </div>
+                    <div class="flex flex-col justify-between gap-y-3">
+                        <div class="space-y-2 text-[15px]">
+                            <div class="flex justify-between"><span class="text-red-400">❤️ HP</span><span id="pl-hptext">65/65</span></div>
+                            <div class="pix-bar"><div class="pix-fill" id="pl-hpbar" style="width:100%; background-color:#FF4E4E"></div></div>
+                            <div class="flex justify-between"><span class="text-[#4E9EFF]">🔮 MP</span><span id="pl-mptext">18/18</span></div>
+                            <div class="pix-bar"><div class="pix-fill" id="pl-mpbar" style="width:100%; background-color:#4E9EFF"></div></div>
+                        </div>
+                        <div class="flex gap-2 text-[13px]">
+                            <button onclick="usePotionOutside()" class="pix-btn flex-1 bg-[#1E2338] text-[#4EFF8E] py-2 text-[9px]" id="btn-potion-out">🧪 x2</button>
+                            <button onclick="useEtherOutside()" class="pix-btn flex-1 bg-[#1E2338] text-[#4E9EFF] py-2 text-[9px]" id="btn-ether-out">💧 x1</button>
+                        </div>
+                        <button onclick="startBattle()" id="dg-enter" class="pix-btn bg-[#C77DFF] text-black py-3 text-[11px] w-full">⚔️ ENTRAR (1⚡)</button>
+                        <div class="text-[13px] text-[#8890B0] text-center">La energía ⚡ se gana completando misiones REALES</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JEFES DE DEUDA -->
+            <div class="pix p-5 sm:p-6" style="border-color:#5C2E2E">
+                <h2 class="font-px text-[13px] text-[#FF4E4E] mb-1">💳 JEFES DE DEUDA</h2>
+                <p class="text-[15px] text-[#8890B0] mb-4">Tus deudas son monstruos. Cada abono real que hagas es un ataque. ¡Mátalas todas!</p>
+                <div id="debt-list" class="space-y-3"></div>
+                <div class="mt-4 pt-4 border-t-2 border-white/10 grid grid-cols-12 gap-2">
+                    <input id="new-debt-name" type="text" placeholder="Ej: Tarjeta Visa" maxlength="40" class="col-span-6 bg-black/40 border-2 border-white/15 px-3 py-2">
+                    <input id="new-debt-total" type="number" placeholder="Monto total" min="1" class="col-span-4 bg-black/40 border-2 border-white/15 px-3 py-2">
+                    <button onclick="addDebt()" class="pix-btn col-span-2 bg-[#FF4E4E] text-black text-[9px]">+ JEFE</button>
+                </div>
+            </div>
+
+            <!-- JEFE DE HÁBITOS SEMANAL -->
+            <div class="pix p-5 sm:p-6 relative" id="boss-card" style="border-color:#5C4A2E">
+                <div class="absolute top-0 right-0 px-2 py-1 bg-[#F5C842] text-black text-[8px] font-px">JEFE DE HÁBITOS</div>
+                <div class="flex items-center gap-x-4">
+                    <div class="w-16 h-16 pix-dark flex items-center justify-center text-4xl sprite sprite-bob" id="boss-emoji">👹</div>
+                    <div class="flex-1">
+                        <div class="font-px text-[12px]" id="boss-name">El Procrastinador</div>
+                        <div class="text-[14px] text-[#8890B0] mt-1">Cada misión real completada le hace daño igual al XP ganado</div>
+                        <div class="mt-2 flex items-center gap-x-3">
+                            <div class="pix-bar flex-1"><div class="pix-fill" id="boss-hpbar" style="width:100%; background-color:#FF4E4E"></div></div>
+                            <span class="text-[15px] text-red-400 whitespace-nowrap" id="boss-hptext">500/500</span>
+                        </div>
+                        <div class="text-[14px] text-[#8890B0] mt-1">Botín: <span class="text-[#F5C842]" id="boss-reward">🪙 200 + 1 cofre</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MISIONES -->
+            <div class="pix p-5 sm:p-6">
+                <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                    <h2 class="font-px text-[13px] text-[#F5C842]">⚔️ MISIONES</h2>
+                    <div class="flex gap-2">
+                        <button onclick="showLibrary()" class="pix-btn px-3 py-2 bg-[#4E9EFF] text-black text-[9px]">📚 BIBLIOTECA</button>
+                        <button onclick="randomQuest()" class="pix-btn px-3 py-2 bg-[#C77DFF] text-black text-[9px]">🎲 SORPRESA</button>
+                    </div>
+                </div>
+
+                <div class="flex gap-x-2 mb-4">
+                    <button id="tab-daily" onclick="setTab('daily')" class="pix-btn px-3 py-1.5 text-[9px] bg-[#F5C842] text-black">DIARIAS</button>
+                    <button id="tab-quest" onclick="setTab('quest')" class="pix-btn px-3 py-1.5 text-[9px] bg-[#151828] text-[#8890B0]">ÚNICAS</button>
+                </div>
+
+                <div id="task-list" class="space-y-2.5"></div>
+
+                <div class="mt-5 pt-5 border-t-2 border-white/10">
+                    <div class="text-[13px] font-px text-[#8890B0] mb-3">NUEVA MISIÓN PROPIA</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <input id="new-task-name" type="text" placeholder="Ej: Hacer ejercicio 30 min" maxlength="80"
+                               class="sm:col-span-5 bg-black/40 border-2 border-white/15 px-3 py-2"
+                               onkeypress="if(event.key==='Enter') addTask()">
+                        <select id="new-task-stat" class="sm:col-span-3 bg-black/40 border-2 border-white/15 px-2 py-2"></select>
+                        <select id="new-task-diff" class="sm:col-span-2 bg-black/40 border-2 border-white/15 px-2 py-2"></select>
+                        <button onclick="addTask()" class="pix-btn sm:col-span-2 bg-[#F5C842] text-black text-[9px] py-2.5">+ AÑADIR</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HISTORIAL -->
+            <details class="pix overflow-hidden">
+                <summary class="px-5 py-3 cursor-pointer font-px text-[11px] hover:bg-white/5">📜 REGISTRO DE AVENTURA</summary>
+                <div id="log-list" class="px-5 pb-4 space-y-1 text-[15px] text-[#8890B0] max-h-56 overflow-y-auto"></div>
+            </details>
+        </div>
+
+        <!-- ========== COLUMNA DERECHA ========== -->
+        <div class="space-y-8">
+
+            <!-- ATRIBUTOS -->
+            <div class="pix p-5">
+                <h2 class="font-px text-[12px] mb-1">📊 ATRIBUTOS</h2>
+                <p class="text-[13px] text-[#8890B0] mb-4">Solo suben con misiones REALES. Definen tu poder en la mazmorra.</p>
+                <div id="stats-list" class="space-y-3"></div>
+                <div id="combat-stats" class="mt-4 pt-4 border-t-2 border-white/10 grid grid-cols-3 gap-2 text-center text-[14px]"></div>
+            </div>
+
+            <!-- DOJO -->
+            <div class="pix p-5" style="border-color:#2E5C3A">
+                <h2 class="font-px text-[12px] text-[#4EFF8E] mb-1">🥋 DOJO — HOY</h2>
+                <p class="text-[13px] text-[#8890B0] mb-4">Entrenamiento diario que escala con tu nivel. Da mucho XP de atributo + 2⚡.</p>
+                <div id="dojo-list" class="space-y-2.5"></div>
+            </div>
+
+            <!-- MISIONES RÁPIDAS -->
+            <div class="pix p-5" style="border-color:#4A5C2E">
+                <h2 class="font-px text-[12px] text-[#F5C842] mb-1">⚡ MISIONES RÁPIDAS</h2>
+                <p class="text-[13px] text-[#8890B0] mb-4">2-5 min. Perfectas para el trabajo. +10 XP y +1⚡ cada una.</p>
+                <div id="micro-list" class="space-y-2.5"></div>
+            </div>
+
+            <!-- INVENTARIO -->
+            <div class="pix p-5">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="font-px text-[12px]">🎒 INVENTARIO</h2>
+                    <button id="chest-btn" onclick="openChestFromPanel()" class="hidden pix-btn px-2.5 py-1.5 bg-[#F5C842] text-black text-[9px] chest-shake">🎁 x<span id="chest-count">0</span></button>
+                </div>
+                <p class="text-[13px] text-[#8890B0] mb-3" id="inv-bonus">Los objetos dan bonus de ATK</p>
+                <div id="inventory-list" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- TIENDA -->
+            <div class="pix p-5">
+                <h2 class="font-px text-[12px] mb-1">🏪 TIENDA</h2>
+                <p class="text-[13px] text-[#8890B0] mb-3">Pociones para la mazmorra y premios de la vida real.</p>
+                <div id="shop-consumables" class="space-y-2.5 mb-4"></div>
+                <div class="text-[13px] font-px text-[#8890B0] mb-2">RECOMPENSAS REALES</div>
+                <div id="shop-list" class="space-y-2.5"></div>
+                <div class="mt-4 pt-4 border-t-2 border-white/10 grid grid-cols-12 gap-2">
+                    <input id="new-reward-name" type="text" placeholder="Ej: 1h de videojuegos" maxlength="60"
+                           class="col-span-6 bg-black/40 border-2 border-white/15 px-3 py-2 text-[16px]"
+                           onkeypress="if(event.key==='Enter') addReward()">
+                    <input id="new-reward-cost" type="number" placeholder="Oro" min="1" max="99999"
+                           class="col-span-3 bg-black/40 border-2 border-white/15 px-2 py-2 text-[16px]">
+                    <button onclick="addReward()" class="pix-btn col-span-3 bg-[#151828] text-[#F5C842] text-[8px]">+ AÑADIR</button>
+                </div>
+            </div>
+
+            <!-- LOGROS -->
+            <div class="pix p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-px text-[12px]">🏆 LOGROS</h2>
+                    <span class="text-[15px] text-[#8890B0]" id="ach-count">0/0</span>
+                </div>
+                <div id="achievements-list" class="grid grid-cols-5 gap-2"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===================== BATALLA ===================== -->
+    <div id="battle-modal" class="hidden fixed inset-0 bg-black/95 z-[160] items-center justify-center p-3 sm:p-5">
+        <div class="pix max-w-lg w-full overflow-hidden" id="battle-box">
+            <div class="px-4 py-2.5 border-b-4 border-black bg-black/40 flex items-center justify-between">
+                <div class="font-px text-[11px] text-[#C77DFF]">🏰 PISO <span id="bt-floor">1</span></div>
+                <div class="text-[14px] text-[#8890B0]">⚡ <span id="bt-energy">9</span>/10</div>
+            </div>
+
+            <!-- Enemigo -->
+            <div class="p-5 text-center pix-dark m-3">
+                <div class="text-7xl sprite sprite-bob inline-block" id="bt-enemy-emoji">🟢</div>
+                <div class="font-px text-[11px] mt-2" id="bt-enemy-name">Slime</div>
+                <div class="flex items-center gap-x-2 mt-2 max-w-[280px] mx-auto">
+                    <div class="pix-bar flex-1"><div class="pix-fill" id="bt-enemy-hpbar" style="width:100%; background-color:#FF4E4E"></div></div>
+                    <span class="text-[14px] text-red-400" id="bt-enemy-hptext">30/30</span>
+                </div>
+            </div>
+
+            <!-- Log -->
+            <div id="bt-log" class="mx-3 mb-3 pix-dark px-3 py-2 h-24 overflow-y-auto text-[15px] space-y-0.5"></div>
+
+            <!-- Jugador -->
+            <div class="mx-3 mb-3 flex items-center gap-x-3">
+                <div class="text-3xl sprite" id="bt-player-avatar">🦸</div>
+                <div class="flex-1 space-y-1.5 text-[14px]">
+                    <div class="flex items-center gap-x-2">
+                        <span class="text-red-400 w-7">HP</span>
+                        <div class="pix-bar thin flex-1"><div class="pix-fill" id="bt-player-hpbar" style="width:100%; background-color:#FF4E4E"></div></div>
+                        <span id="bt-player-hptext" class="w-14 text-right">65/65</span>
+                    </div>
+                    <div class="flex items-center gap-x-2">
+                        <span class="text-[#4E9EFF] w-7">MP</span>
+                        <div class="pix-bar thin flex-1"><div class="pix-fill" id="bt-player-mpbar" style="width:100%; background-color:#4E9EFF"></div></div>
+                        <span id="bt-player-mptext" class="w-14 text-right">18/18</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div id="bt-actions" class="p-3 border-t-4 border-black bg-black/30"></div>
+        </div>
+    </div>
+
+    <!-- ===================== BIBLIOTECA ===================== -->
+    <div id="library-modal" onclick="if(event.target.id==='library-modal') hideLibrary()" class="hidden fixed inset-0 bg-black/92 z-[150] items-center justify-center p-3 sm:p-6">
+        <div class="pix max-w-2xl w-full flex flex-col" style="max-height: 88vh">
+            <div class="px-5 py-3 border-b-4 border-black flex items-center justify-between">
+                <h2 class="font-px text-[12px] text-[#4E9EFF]">📚 BIBLIOTECA DE MISIONES</h2>
+                <button onclick="hideLibrary()" class="text-2xl text-[#8890B0] hover:text-white">&times;</button>
+            </div>
+            <div class="px-5 py-3 space-y-2.5">
+                <input id="lib-search" type="text" placeholder="🔍 Buscar misión..." oninput="renderLibrary()"
+                       class="w-full bg-black/40 border-2 border-white/15 px-3 py-2">
+                <div id="lib-cats" class="flex flex-wrap gap-1.5"></div>
+            </div>
+            <div id="lib-list" class="px-5 pb-5 space-y-2 overflow-y-auto flex-1"></div>
+        </div>
+    </div>
+
+    <!-- ===================== LEVEL UP ===================== -->
+    <div id="levelup-overlay" class="hidden fixed inset-0 bg-black/95 z-[200] items-center justify-center overflow-hidden">
+        <div class="levelup-rays"></div>
+        <div class="relative text-center levelup-pop px-6" id="levelup-content"></div>
+    </div>
+
+    <!-- ===================== ONBOARDING ===================== -->
+    <div id="onboard-modal" class="hidden fixed inset-0 bg-black/95 z-[150] items-center justify-center p-4 overflow-y-auto">
+        <div class="pix max-w-md w-full p-7 my-6">
+            <div class="text-center">
+                <div class="text-4xl sprite">⚔️</div>
+                <h1 class="font-px text-[16px] mt-3 text-[#F5C842]">VIDA RPG</h1>
+                <p class="text-[16px] text-[#8890B0] mt-2">Tu vida real es el juego. Cada tarea te hace más fuerte de verdad.</p>
+            </div>
+            <label class="block font-px text-[9px] text-[#8890B0] mt-6 mb-2">NOMBRE DE HÉROE</label>
+            <input id="onboard-name" type="text" placeholder="Ej: Iván el Conquistador" maxlength="30"
+                   class="w-full bg-black/40 border-2 border-white/20 px-3 py-2.5">
+            <label class="block font-px text-[9px] text-[#8890B0] mt-5 mb-2">AVATAR</label>
+            <div id="onboard-avatars" class="grid grid-cols-6 gap-2"></div>
+            <label class="block font-px text-[9px] text-[#8890B0] mt-5 mb-2">CLASE INICIAL</label>
+            <div id="onboard-classes" class="grid grid-cols-2 gap-2.5"></div>
+            <button onclick="createHero()" class="pix-btn mt-7 w-full py-3.5 bg-[#F5C842] text-black text-[11px]">▶ COMENZAR AVENTURA</button>
+        </div>
+    </div>
+
+    <!-- ===================== AJUSTES ===================== -->
+    <div id="settings-modal" onclick="if(event.target.id==='settings-modal') hideSettings()" class="hidden fixed inset-0 bg-black/90 z-[150] items-center justify-center p-4">
+        <div class="pix max-w-sm w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-px text-[12px]">⚙️ AJUSTES</h2>
+                <button onclick="hideSettings()" class="text-2xl text-[#8890B0] hover:text-white">&times;</button>
+            </div>
+            <label class="block font-px text-[9px] text-[#8890B0] mb-2">NOMBRE</label>
+            <input id="settings-name" type="text" maxlength="30" class="w-full bg-black/40 border-2 border-white/20 px-3 py-2">
+            <label class="block font-px text-[9px] text-[#8890B0] mt-4 mb-2">AVATAR</label>
+            <div id="settings-avatars" class="grid grid-cols-6 gap-2"></div>
+            <button onclick="saveSettings()" class="pix-btn mt-5 w-full py-2.5 bg-[#F5C842] text-black text-[10px]">GUARDAR</button>
+            <div class="mt-5 pt-4 border-t-2 border-white/10 space-y-2.5">
+                <button onclick="exportSave()" class="pix-btn w-full py-2.5 bg-[#151828] text-[#4E9EFF] text-[9px]">💾 EXPORTAR PARTIDA</button>
+                <label class="pix-btn block w-full py-2.5 bg-[#151828] text-[#4EFF8E] text-[9px] text-center cursor-pointer font-px">
+                    📂 IMPORTAR PARTIDA
+                    <input type="file" accept=".json" class="hidden" onchange="importSave(event)">
+                </label>
+                <button onclick="resetGame()" class="pix-btn w-full py-2.5 bg-[#151828] text-red-400 text-[9px]">💀 BORRAR TODO</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /* ================================================================
+       VIDA RPG: PIXEL QUEST — motor del juego
+       ================================================================ */
+    const SAVE_KEY = 'vidaRPG_v1';
+
+    const STATS = {
+        fuerza:       { label: 'Fuerza',       emoji: '💪', color: '#FF4E4E' },
+        inteligencia: { label: 'Inteligencia', emoji: '🧠', color: '#4E9EFF' },
+        disciplina:   { label: 'Disciplina',   emoji: '🛡️', color: '#F5C842' },
+        carisma:      { label: 'Carisma',      emoji: '🗣️', color: '#C77DFF' },
+        vitalidad:    { label: 'Vitalidad',    emoji: '❤️', color: '#4EFF8E' },
+        creatividad:  { label: 'Creatividad',  emoji: '🎨', color: '#FF9E4E' },
+    };
+
+    const DIFF = {
+        facil:   { label: 'Fácil',   xp: 20,  gold: 5,  color: '#4EFF8E' },
+        normal:  { label: 'Normal',  xp: 40,  gold: 10, color: '#4E9EFF' },
+        dificil: { label: 'Difícil', xp: 80,  gold: 20, color: '#F5C842' },
+        epica:   { label: 'Épica',   xp: 150, gold: 40, color: '#FF4E4E' },
+    };
+
+    const TITLES = [
+        [1,'Novato'],[3,'Aprendiz'],[5,'Aventurero'],[8,'Guerrero'],[12,'Veterano'],
+        [16,'Élite'],[20,'Maestro'],[25,'Héroe'],[30,'Leyenda'],[40,'Mítico'],[50,'Ascendido'],
+    ];
+    const RANKS = [ [1,'E'],[5,'D'],[10,'C'],[15,'B'],[20,'A'],[30,'S'],[40,'SS'],[50,'SSS'] ];
+    const AVATARS = ['🦸','🥷','🧙','⚔️','🐉','🦁','🐺','🔥','⚡','🏹','👾','🤖'];
+
+    const CLASSES = [
+        { id:'guerrero',   name:'Guerrero',   emoji:'⚔️', desc:'+80 XP Fuerza',       stat:'fuerza' },
+        { id:'erudito',    name:'Erudito',    emoji:'📖', desc:'+80 XP Inteligencia', stat:'inteligencia' },
+        { id:'monje',      name:'Monje',      emoji:'🧘', desc:'+80 XP Disciplina',   stat:'disciplina' },
+        { id:'explorador', name:'Explorador', emoji:'🧭', desc:'+80 XP Vitalidad',    stat:'vitalidad' },
+    ];
+
+    const HABIT_BOSSES = [
+        { name:'El Procrastinador',       emoji:'👹' },
+        { name:'La Pereza Suprema',       emoji:'🦥' },
+        { name:'Rey del Scroll Infinito', emoji:'📱' },
+        { name:'El Caos del Desorden',    emoji:'🌪️' },
+        { name:'La Duda Interior',        emoji:'👻' },
+        { name:'Señor de las Excusas',    emoji:'🐍' },
+    ];
+
+    const ITEMS = [
+        { n:'Espada del Enfoque',          e:'🗡️', r:'común' },
+        { n:'Poción de Café Infinito',     e:'☕', r:'común' },
+        { n:'Manzana de la Energía',       e:'🍎', r:'común' },
+        { n:'Mapa del Día Productivo',     e:'🗺️', r:'común' },
+        { n:'Pluma de las Ideas',          e:'🪶', r:'común' },
+        { n:'Escudo Anti-Distracciones',   e:'🛡️', r:'raro' },
+        { n:'Botas de la Madrugada',       e:'👢', r:'raro' },
+        { n:'Amuleto de la Constancia',    e:'📿', r:'raro' },
+        { n:'Reloj del Tiempo Bien Usado', e:'⏳', r:'raro' },
+        { n:'Grimorio del Conocimiento',   e:'📖', r:'épico' },
+        { n:'Capa del Héroe Productivo',   e:'🦸', r:'épico' },
+        { n:'Martillo de la Voluntad',     e:'🔨', r:'épico' },
+        { n:'Corona de la Disciplina',     e:'👑', r:'legendario' },
+        { n:'Fénix de la Motivación',      e:'🔥', r:'legendario' },
+        { n:'Dragón Domado del Caos',      e:'🐉', r:'legendario' },
+    ];
+    const RARITY = {
+        'común':      { w: 55, gold: 15,  atk: 1, color: '#8890B0' },
+        'raro':       { w: 28, gold: 40,  atk: 2, color: '#4E9EFF' },
+        'épico':      { w: 13, gold: 90,  atk: 4, color: '#C77DFF' },
+        'legendario': { w: 4,  gold: 200, atk: 7, color: '#F5C842' },
+    };
+
+    const SPELLS = [
+        { id:'chispa',  name:'Chispa',             emoji:'✨', intReq:1,  mp:4,  mult:1.3, type:'dmg' },
+        { id:'fuego',   name:'Bola de Fuego',      emoji:'🔥', intReq:3,  mp:8,  mult:2.0, type:'dmg' },
+        { id:'hielo',   name:'Rayo Helado',        emoji:'❄️', intReq:5,  mp:10, mult:1.6, type:'dmg', freeze:0.35 },
+        { id:'cura',    name:'Curación',           emoji:'💚', intReq:7,  mp:12, type:'heal', healPct:0.4 },
+        { id:'trueno',  name:'Tormenta Eléctrica', emoji:'⚡', intReq:10, mp:16, mult:2.8, type:'dmg' },
+        { id:'meteoro', name:'Meteoro',            emoji:'☄️', intReq:14, mp:25, mult:4.2, type:'dmg' },
+    ];
+
+    const ENEMIES = [
+        { n:'Slime', e:'🟢' }, { n:'Rata Gigante', e:'🐀' }, { n:'Murciélago', e:'🦇' },
+        { n:'Duende', e:'👺' }, { n:'Esqueleto', e:'💀' }, { n:'Araña Venenosa', e:'🕷️' },
+        { n:'Zombi', e:'🧟' }, { n:'Espectro', e:'👻' }, { n:'Serpiente', e:'🐍' },
+        { n:'Lobo Salvaje', e:'🐺' }, { n:'Gólem', e:'🗿' }, { n:'Bruja Oscura', e:'🧙‍♀️' },
+        { n:'Demonio Menor', e:'😈' }, { n:'Dragón Joven', e:'🐲' }, { n:'Caballero Caído', e:'🛡️' },
+    ];
+    const DUNGEON_BOSSES = [
+        { n:'Ogro Ancestral', e:'👹' }, { n:'Rey Esqueleto', e:'☠️' }, { n:'Hidra de Tres Cabezas', e:'🐉' },
+        { n:'Kraken de las Profundidades', e:'🦑' }, { n:'Titán de Piedra', e:'🗿' }, { n:'Señor Demonio', e:'👿' },
+    ];
+
+    const CATS = {
+        todas:    { label: 'Todas',    e: '🌟' },
+        fisico:   { label: 'Físico',   e: '💪' },
+        mente:    { label: 'Mente',    e: '🧠' },
+        ingles:   { label: 'Inglés',   e: '🗽' },
+        habitos:  { label: 'Hábitos',  e: '🛡️' },
+        social:   { label: 'Social',   e: '🗣️' },
+        creativo: { label: 'Creativo', e: '🎨' },
+        salud:    { label: 'Salud',    e: '❤️' },
+        finanzas: { label: 'Finanzas', e: '💰' },
+        micro:    { label: 'Micro',    e: '⚡' },
+    };
+
+    /* ---------------- biblioteca de misiones ---------------- */
+    const LIB = [
+        // FÍSICO
+        { n:'Haz 10 flexiones',                                s:'fuerza', d:'facil',   c:'fisico' },
+        { n:'Haz 3x10 flexiones',                              s:'fuerza', d:'normal',  c:'fisico' },
+        { n:'Haz 20 sentadillas',                              s:'fuerza', d:'facil',   c:'fisico' },
+        { n:'Haz 4x15 sentadillas',                            s:'fuerza', d:'normal',  c:'fisico' },
+        { n:'Plancha 1 minuto',                                s:'fuerza', d:'facil',   c:'fisico' },
+        { n:'Plancha 3x1 minuto',                              s:'fuerza', d:'normal',  c:'fisico' },
+        { n:'30 min de gimnasio',                              s:'fuerza', d:'normal',  c:'fisico' },
+        { n:'1 hora de gimnasio completa',                     s:'fuerza', d:'dificil', c:'fisico' },
+        { n:'Sal a correr 20 min',                             s:'fuerza', d:'normal',  c:'fisico' },
+        { n:'Corre 5 km',                                      s:'fuerza', d:'dificil', c:'fisico' },
+        { n:'100 saltos de cuerda',                            s:'fuerza', d:'facil',   c:'fisico' },
+        { n:'10 burpees',                                      s:'fuerza', d:'facil',   c:'fisico' },
+        { n:'3x10 burpees',                                    s:'fuerza', d:'dificil', c:'fisico' },
+        { n:'Estira todo el cuerpo 10 min',                    s:'fuerza', d:'facil',   c:'fisico' },
+        { n:'Escaleras en vez de ascensor todo el día',        s:'fuerza', d:'facil',   c:'fisico' },
+        { n:'Camina 10.000 pasos hoy',                         s:'fuerza', d:'dificil', c:'fisico' },
+        { n:'Rutina de abdominales 15 min',                    s:'fuerza', d:'normal',  c:'fisico' },
+        { n:'Haz ejercicio antes de las 9 AM',                 s:'fuerza', d:'dificil', c:'fisico' },
+        { n:'Semana perfecta: 5 días de ejercicio',            s:'fuerza', d:'epica',   c:'fisico' },
+        { n:'Toma una ducha fría',                             s:'fuerza', d:'normal',  c:'fisico' },
+        // MENTE
+        { n:'Lee 10 páginas de un libro',                      s:'inteligencia', d:'facil',   c:'mente' },
+        { n:'Lee 30 páginas',                                  s:'inteligencia', d:'normal',  c:'mente' },
+        { n:'Termina un capítulo de un libro',                 s:'inteligencia', d:'normal',  c:'mente' },
+        { n:'Estudia 25 min con Pomodoro',                     s:'inteligencia', d:'facil',   c:'mente' },
+        { n:'Estudia 1 hora sin celular',                      s:'inteligencia', d:'normal',  c:'mente' },
+        { n:'Estudia 2 horas en modo monje',                   s:'inteligencia', d:'dificil', c:'mente' },
+        { n:'Ve un documental y anota 3 ideas',                s:'inteligencia', d:'normal',  c:'mente' },
+        { n:'Aprende algo en YouTube y resúmelo',              s:'inteligencia', d:'facil',   c:'mente' },
+        { n:'Avanza 30 min en un curso online',                s:'inteligencia', d:'normal',  c:'mente' },
+        { n:'Resuelve 10 ejercicios de mate o lógica',         s:'inteligencia', d:'normal',  c:'mente' },
+        { n:'Escribe un resumen de lo que aprendiste hoy',     s:'inteligencia', d:'facil',   c:'mente' },
+        { n:'Repasa tus apuntes de la semana',                 s:'inteligencia', d:'normal',  c:'mente' },
+        { n:'Aprende 5 datos de un tema al azar',              s:'inteligencia', d:'facil',   c:'mente' },
+        { n:'Juega ajedrez o un juego de lógica 20 min',       s:'inteligencia', d:'facil',   c:'mente' },
+        { n:'Investiga a fondo un tema 1 hora',                s:'inteligencia', d:'dificil', c:'mente' },
+        { n:'Termina un libro completo',                       s:'inteligencia', d:'epica',   c:'mente' },
+        // INGLÉS
+        { n:'Aprende 5 palabras nuevas en inglés',             s:'inteligencia', d:'facil',   c:'ingles' },
+        { n:'Aprende 10 palabras y úsalas en frases',          s:'inteligencia', d:'normal',  c:'ingles' },
+        { n:'Ve un video en inglés sin subtítulos',            s:'inteligencia', d:'normal',  c:'ingles' },
+        { n:'Episodio en inglés con subs en inglés',           s:'inteligencia', d:'normal',  c:'ingles' },
+        { n:'Practica 15 min en una app de idiomas',           s:'inteligencia', d:'facil',   c:'ingles' },
+        { n:'Graba un audio hablando inglés 5 min',            s:'carisma',      d:'normal',  c:'ingles' },
+        { n:'Piensa en inglés durante 30 min',                 s:'inteligencia', d:'normal',  c:'ingles' },
+        { n:'Escribe tu día en inglés (10 líneas)',            s:'inteligencia', d:'normal',  c:'ingles' },
+        { n:'Ten una conversación real en inglés',             s:'carisma',      d:'dificil', c:'ingles' },
+        { n:'Lee un artículo completo en inglés',              s:'inteligencia', d:'normal',  c:'ingles' },
+        { n:'Aprende 3 phrasal verbs y úsalos',                s:'inteligencia', d:'facil',   c:'ingles' },
+        { n:'Shadowing: repite un video 10 min',               s:'carisma',      d:'normal',  c:'ingles' },
+        // HÁBITOS
+        { n:'Tiende la cama al despertar',                     s:'disciplina', d:'facil',   c:'habitos' },
+        { n:'Despiértate a la primera alarma',                 s:'disciplina', d:'normal',  c:'habitos' },
+        { n:'Levántate antes de las 7 AM',                     s:'disciplina', d:'dificil', c:'habitos' },
+        { n:'Nada de redes la primera hora del día',           s:'disciplina', d:'normal',  c:'habitos' },
+        { n:'Máximo 1h de redes sociales hoy',                 s:'disciplina', d:'dificil', c:'habitos' },
+        { n:'Planea tu día de mañana por escrito',             s:'disciplina', d:'facil',   c:'habitos' },
+        { n:'Ordena tu escritorio',                            s:'disciplina', d:'facil',   c:'habitos' },
+        { n:'Limpia tu cuarto completo',                       s:'disciplina', d:'dificil', c:'habitos' },
+        { n:'Lava los platos apenas termines de comer',        s:'disciplina', d:'facil',   c:'habitos' },
+        { n:'Haz PRIMERO la tarea que más pereza te da',       s:'disciplina', d:'dificil', c:'habitos' },
+        { n:'Cero azúcar hoy',                                 s:'disciplina', d:'dificil', c:'habitos' },
+        { n:'Medita 5 minutos',                                s:'disciplina', d:'facil',   c:'habitos' },
+        { n:'Medita 15 minutos',                               s:'disciplina', d:'normal',  c:'habitos' },
+        { n:'Diario: escribe 3 cosas buenas de hoy',           s:'disciplina', d:'facil',   c:'habitos' },
+        { n:'Revisa tus metas del mes',                        s:'disciplina', d:'facil',   c:'habitos' },
+        { n:'Día completo sin quejarte ni una vez',            s:'disciplina', d:'dificil', c:'habitos' },
+        { n:'Detox digital: 3 horas sin pantallas',            s:'disciplina', d:'epica',   c:'habitos' },
+        // SOCIAL
+        { n:'Saluda a alguien nuevo',                          s:'carisma', d:'facil',   c:'social' },
+        { n:'Escríbele a un amigo que no ves hace tiempo',     s:'carisma', d:'facil',   c:'social' },
+        { n:'Llama (no chat) a un familiar',                   s:'carisma', d:'normal',  c:'social' },
+        { n:'Da un cumplido genuino a alguien',                s:'carisma', d:'facil',   c:'social' },
+        { n:'Cuenta una historia y hazla interesante',         s:'carisma', d:'normal',  c:'social' },
+        { n:'Habla con un desconocido',                        s:'carisma', d:'dificil', c:'social' },
+        { n:'Organiza un plan con amigos',                     s:'carisma', d:'normal',  c:'social' },
+        { n:'Pide feedback honesto a alguien',                 s:'carisma', d:'normal',  c:'social' },
+        { n:'Di "no" a algo que no quieres hacer',             s:'carisma', d:'normal',  c:'social' },
+        { n:'Haz una pregunta en clase o reunión',             s:'carisma', d:'normal',  c:'social' },
+        { n:'Agradece a alguien por algo específico',          s:'carisma', d:'facil',   c:'social' },
+        { n:'Almuerza con alguien sin celulares',              s:'carisma', d:'normal',  c:'social' },
+        // CREATIVO
+        { n:'Dibuja 15 minutos',                               s:'creatividad', d:'facil',   c:'creativo' },
+        { n:'Escribe 200 palabras de lo que sea',              s:'creatividad', d:'facil',   c:'creativo' },
+        { n:'Haz una foto artística',                          s:'creatividad', d:'facil',   c:'creativo' },
+        { n:'Aprende 4 compases de una canción',               s:'creatividad', d:'normal',  c:'creativo' },
+        { n:'Escribe una idea de negocio',                     s:'creatividad', d:'normal',  c:'creativo' },
+        { n:'Crea contenido y publícalo',                      s:'creatividad', d:'dificil', c:'creativo' },
+        { n:'Diseña algo en tu programa favorito',             s:'creatividad', d:'normal',  c:'creativo' },
+        { n:'Lluvia de ideas: 20 ideas sobre un tema',         s:'creatividad', d:'normal',  c:'creativo' },
+        { n:'Escribe un mini-cuento de 1 página',              s:'creatividad', d:'normal',  c:'creativo' },
+        { n:'Aprende un truco o habilidad curiosa',            s:'creatividad', d:'facil',   c:'creativo' },
+        { n:'Avanza 1 hora en tu proyecto personal',           s:'creatividad', d:'dificil', c:'creativo' },
+        { n:'Termina una obra o proyecto creativo',            s:'creatividad', d:'epica',   c:'creativo' },
+        // SALUD
+        { n:'Bebe 2L de agua hoy',                             s:'vitalidad', d:'normal',  c:'salud' },
+        { n:'Bebe un vaso de agua al despertar',               s:'vitalidad', d:'facil',   c:'salud' },
+        { n:'Come una fruta',                                  s:'vitalidad', d:'facil',   c:'salud' },
+        { n:'Come verduras en 2 comidas',                      s:'vitalidad', d:'normal',  c:'salud' },
+        { n:'Cero comida chatarra hoy',                        s:'vitalidad', d:'dificil', c:'salud' },
+        { n:'Cocina tu propia comida',                         s:'vitalidad', d:'normal',  c:'salud' },
+        { n:'Duerme 8 horas',                                  s:'vitalidad', d:'normal',  c:'salud' },
+        { n:'Acuéstate antes de las 11 PM',                    s:'vitalidad', d:'dificil', c:'salud' },
+        { n:'Sin cafeína después de las 3 PM',                 s:'vitalidad', d:'facil',   c:'salud' },
+        { n:'Camina 15 min al aire libre',                     s:'vitalidad', d:'facil',   c:'salud' },
+        { n:'Toma 10 min de sol',                              s:'vitalidad', d:'facil',   c:'salud' },
+        { n:'Día completo de comida saludable',                s:'vitalidad', d:'epica',   c:'salud' },
+        // FINANZAS
+        { n:'Anota todos tus gastos de hoy',                   s:'disciplina', d:'facil',   c:'finanzas' },
+        { n:'Revisa tus cuentas 10 min',                       s:'disciplina', d:'facil',   c:'finanzas' },
+        { n:'Ahorra algo hoy, lo que sea',                     s:'disciplina', d:'normal',  c:'finanzas' },
+        { n:'Día sin gastos innecesarios',                     s:'disciplina', d:'normal',  c:'finanzas' },
+        { n:'Cancela una suscripción que no usas',             s:'disciplina', d:'normal',  c:'finanzas' },
+        { n:'Aprende 15 min sobre finanzas',                   s:'inteligencia', d:'facil', c:'finanzas' },
+        { n:'Haz tu presupuesto del mes',                      s:'disciplina', d:'dificil', c:'finanzas' },
+        { n:'Vende algo que ya no uses',                       s:'disciplina', d:'dificil', c:'finanzas' },
+        { n:'Abona extra a una deuda',                         s:'disciplina', d:'dificil', c:'finanzas' },
+        { n:'Semana entera sin pedir delivery',                s:'disciplina', d:'epica',   c:'finanzas' },
+        // MICRO (2-5 min)
+        { n:'Bebe un vaso de agua',                            s:'vitalidad',   d:'facil', c:'micro' },
+        { n:'Estírate 2 minutos',                              s:'fuerza',      d:'facil', c:'micro' },
+        { n:'10 respiraciones profundas',                      s:'disciplina',  d:'facil', c:'micro' },
+        { n:'Corrige tu postura, hombros atrás',               s:'vitalidad',   d:'facil', c:'micro' },
+        { n:'Camina 3 minutos',                                s:'vitalidad',   d:'facil', c:'micro' },
+        { n:'Anota 1 idea que tengas en la cabeza',            s:'creatividad', d:'facil', c:'micro' },
+        { n:'Aprende 1 palabra nueva en inglés',               s:'inteligencia',d:'facil', c:'micro' },
+        { n:'Ordena 1 cosa de tu espacio',                     s:'disciplina',  d:'facil', c:'micro' },
+        { n:'Manda un mensaje amable a alguien',               s:'carisma',     d:'facil', c:'micro' },
+        { n:'Mira lejos 20 seg (regla 20-20-20)',              s:'vitalidad',   d:'facil', c:'micro' },
+        { n:'5 sentadillas discretas',                         s:'fuerza',      d:'facil', c:'micro' },
+        { n:'Repasa mentalmente tus 3 prioridades',            s:'disciplina',  d:'facil', c:'micro' },
+        { n:'Agradece 1 cosa mentalmente',                     s:'disciplina',  d:'facil', c:'micro' },
+        { n:'1 minuto de silencio total',                      s:'disciplina',  d:'facil', c:'micro' },
+        { n:'Apunta un gasto que hiciste hoy',                 s:'disciplina',  d:'facil', c:'micro' },
+        { n:'Lee 1 página de algo',                            s:'inteligencia',d:'facil', c:'micro' },
+    ];
+
+    /* ---------------- dojo (entrenamiento escalado) ---------------- */
+    const DOJO_TPL = {
+        fuerza: [
+            lvl => `Haz ${8 + lvl*2} flexiones`,
+            lvl => `Haz ${15 + lvl*5} sentadillas`,
+            lvl => `Plancha ${30 + lvl*10} segundos`,
+            lvl => `Haz ${5 + lvl*2} burpees`,
+            lvl => `${40 + lvl*15} saltos de cuerda`,
+        ],
+        inteligencia: [
+            lvl => `Lee ${6 + lvl*2} páginas`,
+            lvl => `Estudia ${15 + lvl*5} min con enfoque total`,
+            lvl => `Aprende ${3 + lvl} palabras en inglés`,
+            lvl => `Escribe un resumen de ${3 + lvl} líneas de algo que aprendiste`,
+        ],
+        vitalidad: [
+            lvl => `Camina ${10 + lvl*3} minutos`,
+            lvl => `Bebe ${Math.min(8, 3 + lvl)} vasos de agua hoy`,
+        ],
+        disciplina: [
+            lvl => `Medita ${3 + lvl*2} minutos`,
+            lvl => `Trabaja ${15 + lvl*5} min sin tocar el celular`,
+        ],
+        carisma: [
+            lvl => `Habla ${2 + lvl} min en voz alta practicando inglés`,
+            lvl => `Inicia ${Math.min(5, 1 + Math.floor(lvl/2))} conversación(es) hoy`,
+        ],
+        creatividad: [
+            lvl => `Dedica ${10 + lvl*3} min a crear algo`,
+            lvl => `Escribe ${10 + lvl*5} ideas locas`,
+        ],
+    };
+
+    /* ---------------- logros ---------------- */
+    const ACHIEVEMENTS = [
+        { id:'primera',      icon:'🩸', n:'Primera Sangre',     d:'Completa tu primera misión',               c:s=>s.totals.tasksDone>=1 },
+        { id:'diez',         icon:'⚔️', n:'Guerrero Constante', d:'Completa 10 misiones',                     c:s=>s.totals.tasksDone>=10 },
+        { id:'cincuenta',    icon:'🏹', n:'Imparable',          d:'Completa 50 misiones',                     c:s=>s.totals.tasksDone>=50 },
+        { id:'cien',         icon:'🏆', n:'Centurión',          d:'Completa 100 misiones',                    c:s=>s.totals.tasksDone>=100 },
+        { id:'nivel5',       icon:'⭐', n:'Ascenso',            d:'Alcanza el nivel 5',                       c:s=>s.hero.level>=5 },
+        { id:'nivel10',      icon:'🌟', n:'Doble Dígito',       d:'Alcanza el nivel 10',                      c:s=>s.hero.level>=10 },
+        { id:'nivel20',      icon:'💫', n:'Poder Superior',     d:'Alcanza el nivel 20',                      c:s=>s.hero.level>=20 },
+        { id:'racha3',       icon:'🔥', n:'Encendido',          d:'Racha de 3 días seguidos',                 c:s=>s.streak.count>=3 },
+        { id:'racha7',       icon:'🌋', n:'Semana de Fuego',    d:'Racha de 7 días seguidos',                 c:s=>s.streak.count>=7 },
+        { id:'racha30',      icon:'☄️', n:'Leyenda Viva',       d:'Racha de 30 días seguidos',                c:s=>s.streak.count>=30 },
+        { id:'rico',         icon:'💰', n:'Bolsillos Llenos',   d:'Acumula 500 de oro',                       c:s=>s.gold>=500 },
+        { id:'jefe',         icon:'👹', n:'Cazador de Hábitos', d:'Derrota a tu primer jefe de hábitos',      c:s=>s.totals.bossesKilled>=1 },
+        { id:'compra',       icon:'🛍️', n:'Date un Gusto',      d:'Canjea tu primera recompensa',             c:s=>s.totals.rewardsBought>=1 },
+        { id:'madrugador',   icon:'🌅', n:'Madrugador',         d:'Completa una misión antes de las 8 AM',    c:s=>s.totals.early },
+        { id:'noctambulo',   icon:'🦉', n:'Noctámbulo',         d:'Completa una misión después de las 10 PM', c:s=>s.totals.late },
+        { id:'coleccionista',icon:'🎒', n:'Coleccionista',      d:'Consigue 5 objetos',                       c:s=>s.inventory.length>=5 },
+        { id:'legendario',   icon:'👑', n:'Toque Legendario',   d:'Consigue un objeto legendario',            c:s=>s.inventory.some(i=>i.r==='legendario') },
+        { id:'duelo1',       icon:'🗡️', n:'Primer Duelo',       d:'Gana tu primera batalla en la mazmorra',   c:s=>s.totals.battlesWon>=1 },
+        { id:'verdugo',      icon:'⚰️', n:'Verdugo',            d:'Gana 25 batallas',                         c:s=>s.totals.battlesWon>=25 },
+        { id:'piso5',        icon:'🏰', n:'Explorador Oscuro',  d:'Llega al piso 5 de la mazmorra',           c:s=>s.dungeon.bestFloor>=5 },
+        { id:'piso10',       icon:'🐉', n:'Amo del Calabozo',   d:'Llega al piso 10 de la mazmorra',          c:s=>s.dungeon.bestFloor>=10 },
+        { id:'mago',         icon:'✨', n:'Aprendiz de Mago',   d:'Lanza 10 hechizos',                        c:s=>s.totals.spellsCast>=10 },
+        { id:'archimago',    icon:'🧙', n:'Archimago',          d:'Lanza 50 hechizos',                        c:s=>s.totals.spellsCast>=50 },
+        { id:'contra',       icon:'💳', n:'Contraataque',       d:'Haz tu primer ataque a una deuda',         c:s=>s.totals.debtAttacks>=1 },
+        { id:'libre',        icon:'🕊️', n:'Libre de Deudas',    d:'Elimina una deuda completa',               c:s=>s.totals.debtsKilled>=1 },
+        { id:'dojo10',       icon:'🥋', n:'Discípulo',          d:'Completa 10 entrenamientos del dojo',      c:s=>s.totals.trainingsDone>=10 },
+        { id:'ninja',        icon:'🌪️', n:'Ninja del Trabajo',  d:'Completa 25 misiones rápidas',             c:s=>s.totals.microDone>=25 },
+    ];
+
+    /* ---------------- estado ---------------- */
+    let S = null;
+    let activeTab = 'daily';
+    let libCat = 'todas';
+    let onboardAvatar = AVATARS[0];
+    let onboardClass = CLASSES[0].id;
+    let settingsAvatar = null;
+    let B = null; // batalla en curso
+
+    function todayStr(d) {
+        d = d || new Date();
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    function yesterdayStr() { const d = new Date(); d.setDate(d.getDate()-1); return todayStr(d); }
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+    function fmt(n) { return Math.round(n).toLocaleString('es-CO'); }
+
+    function defaultState(name, avatar, classId) {
+        const cls = CLASSES.find(c=>c.id===classId) || CLASSES[0];
+        const stats = {};
+        Object.keys(STATS).forEach(k => stats[k] = { xp: 0 });
+        stats[cls.stat].xp = 80;
+        return {
+            hero: { name: name, avatar: avatar, level: 1, xp: 0, class: cls.name },
+            gold: 50,
+            stats: stats,
+            dailies: [
+                { id: uid(), name:'Hacer ejercicio 30 min',      stat:'fuerza',       diff:'normal', doneDate:'' },
+                { id: uid(), name:'Leer 10 páginas',             stat:'inteligencia', diff:'facil',  doneDate:'' },
+                { id: uid(), name:'Tender la cama al despertar', stat:'disciplina',   diff:'facil',  doneDate:'' },
+                { id: uid(), name:'Dormir antes de las 12',      stat:'vitalidad',    diff:'normal', doneDate:'' },
+            ],
+            quests: [],
+            boss: { name: HABIT_BOSSES[0].name, emoji: HABIT_BOSSES[0].emoji, maxHp: 500, hp: 500, tier: 1 },
+            debts: [],
+            combat: { hp: 65, mp: 18, energy: 10, potions: 2, ethers: 1 },
+            dungeon: { floor: 1, kills: 0, bestFloor: 1 },
+            dojo: null,
+            micro: null,
+            meta: { lastSeen: '' },
+            rewards: [
+                { id: uid(), name:'1 hora de videojuegos',    cost: 50 },
+                { id: uid(), name:'Ver un capítulo de serie', cost: 30 },
+                { id: uid(), name:'Snack favorito',           cost: 40 },
+            ],
+            inventory: [],
+            chests: 0,
+            achievements: {},
+            streak: { count: 0, lastDate: '' },
+            totals: { tasksDone: 0, xpEarned: 0, bossesKilled: 0, rewardsBought: 0, early: false, late: false,
+                      battlesWon: 0, spellsCast: 0, debtAttacks: 0, debtsKilled: 0, trainingsDone: 0, microDone: 0 },
+            settings: { sound: true },
+            log: [],
+        };
+    }
+
+    function migrate(s) {
+        const d = defaultState('x', AVATARS[0], 'guerrero');
+        for (const k of Object.keys(d)) if (s[k] === undefined) s[k] = d[k];
+        for (const k of Object.keys(d.totals)) if (s.totals[k] === undefined) s.totals[k] = d.totals[k];
+        for (const k of Object.keys(d.combat)) if (s.combat[k] === undefined) s.combat[k] = d.combat[k];
+        return s;
+    }
+
+    function save() { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }
+    function load() {
+        try {
+            const raw = localStorage.getItem(SAVE_KEY);
+            if (raw) S = migrate(JSON.parse(raw));
+        } catch(e) { S = null; }
+    }
+
+    /* ---------------- stats derivados (combate) ---------------- */
+    const statLvl  = k => Math.floor((S.stats[k] ? S.stats[k].xp : 0) / 100) + 1;
+    const itemAtk  = () => Math.min(30, S.inventory.reduce((a,i) => a + (RARITY[i.r] ? RARITY[i.r].atk : 0), 0));
+    const maxHp    = () => 50 + statLvl('vitalidad') * 15;
+    const maxMp    = () => 10 + statLvl('inteligencia') * 8;
+    const atkPower = () => 6 + statLvl('fuerza') * 3 + itemAtk();
+    const magPower = () => 6 + statLvl('inteligencia') * 3;
+    const defPower = () => statLvl('disciplina');
+    const critPct  = () => Math.min(40, 4 + statLvl('creatividad') * 2);
+    const goldMult = () => 1 + statLvl('carisma') * 0.05;
+    const knownSpells = () => SPELLS.filter(sp => statLvl('inteligencia') >= sp.intReq);
+
+    /* ---------------- sonido (chiptune WebAudio) ---------------- */
+    let audioCtx = null;
+    function beep(freq, delay, dur, type, vol) {
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type || 'square'; o.frequency.value = freq;
+        g.gain.setValueAtTime(vol || 0.09, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t); o.stop(t + dur);
+    }
+    function playSound(kind) {
+        if (!S || !S.settings.sound) return;
+        try {
+            audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (kind === 'complete')   { beep(660,0,.1); beep(880,.08,.16); }
+            if (kind === 'gold')       { beep(1200,0,.07,'square',.05); beep(1500,.06,.09,'square',.05); }
+            if (kind === 'levelup')    { [523,659,784,1047].forEach((f,i)=>beep(f,i*.1,.25,'square',.06)); beep(1319,.44,.5,'triangle',.12); }
+            if (kind === 'chest')      { beep(392,0,.13); beep(523,.1,.13); beep(784,.2,.35,'triangle',.13); }
+            if (kind === 'achievement'){ beep(784,0,.12,'triangle'); beep(988,.1,.28,'triangle'); }
+            if (kind === 'hit')        { beep(150,0,.14,'sawtooth',.11); }
+            if (kind === 'magic')      { beep(880,0,.08,'triangle',.09); beep(1100,.06,.08,'triangle',.09); beep(1400,.12,.16,'triangle',.11); }
+            if (kind === 'playerhit')  { beep(110,0,.18,'sawtooth',.12); }
+            if (kind === 'victory')    { [659,784,988,1319].forEach((f,i)=>beep(f,i*.09,.22,'square',.07)); }
+            if (kind === 'defeat')     { beep(220,0,.25,'sawtooth',.1); beep(165,.2,.3,'sawtooth',.1); beep(110,.45,.6,'sawtooth',.12); }
+            if (kind === 'error')      { beep(220,0,.18,'sawtooth',.06); }
+        } catch(e) {}
+    }
+    function toggleSound() {
+        S.settings.sound = !S.settings.sound;
+        save(); renderSoundIcon();
+        if (S.settings.sound) playSound('complete');
+    }
+    function renderSoundIcon() {
+        const el = document.getElementById('sound-icon');
+        el.textContent = S.settings.sound ? '♪' : '✕';
+        el.style.color = S.settings.sound ? '#F5C842' : '#8890B0';
+    }
+
+    /* ---------------- efectos ---------------- */
+    function floatText(text, ev, color) {
+        const el = document.createElement('div');
+        el.className = 'xp-float';
+        el.style.color = color || '#F5C842';
+        el.textContent = text;
+        const x = ev && ev.clientX ? ev.clientX : window.innerWidth/2;
+        const y = ev && ev.clientY ? ev.clientY : window.innerHeight/2;
+        el.style.left = Math.min(x - 30, window.innerWidth - 130) + 'px';
+        el.style.top = (y - 30) + 'px';
+        document.body.appendChild(el);
+        setTimeout(()=>el.remove(), 1150);
+    }
+
+    function confetti(n) {
+        const colors = ['#F5C842','#4E9EFF','#4EFF8E','#C77DFF','#FF9E4E'];
+        for (let i = 0; i < (n||36); i++) {
+            const p = document.createElement('div');
+            p.className = 'fixed pointer-events-none z-[300]';
+            const size = 5 + Math.random()*6;
+            p.style.width = size+'px'; p.style.height = size+'px';
+            p.style.left = Math.random()*100 + 'vw';
+            p.style.top = '-12px';
+            p.style.background = colors[Math.floor(Math.random()*colors.length)];
+            document.body.appendChild(p);
+            p.animate([
+                { transform:'translateY(0) rotate(0deg)', opacity:1 },
+                { transform:`translateY(${window.innerHeight+80}px) rotate(${Math.random()*540}deg)`, opacity:0 }
+            ], { duration: 1300+Math.random()*900, easing:'steps(14)' }).onfinish = ()=>p.remove();
+        }
+    }
+
+    function showToast(msg, border) {
+        const toast = document.createElement('div');
+        toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 pix px-5 py-2.5 text-[17px] z-[350] max-w-[92vw] text-center';
+        toast.style.borderColor = border || '#2E3450';
+        toast.innerHTML = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.transition = 'opacity .25s steps(4)';
+            toast.style.opacity = '0';
+            setTimeout(()=>toast.remove(), 280);
+        }, 2600);
+    }
+
+    /* ---------------- progresión ---------------- */
+    function xpNeeded(level) { return 100 + (level-1)*50; }
+    function heroTitle(level) { let t = TITLES[0][1]; TITLES.forEach(([lv,n]) => { if (level >= lv) t = n; }); return t; }
+    function heroRank(level)  { let r = RANKS[0][1];  RANKS.forEach(([lv,n]) => { if (level >= lv) r = n; }); return r; }
+    function streakMult() { return 1 + Math.min(Math.max(S.streak.count-1,0), 10) * 0.05; }
+
+    function gainXP(amount, statKey) {
+        S.totals.xpEarned += amount;
+        if (statKey && S.stats[statKey]) S.stats[statKey].xp += amount;
+        S.hero.xp += amount;
+        let ups = 0;
+        while (S.hero.xp >= xpNeeded(S.hero.level)) {
+            S.hero.xp -= xpNeeded(S.hero.level);
+            S.hero.level++;
+            S.chests++;
+            ups++;
+        }
+        if (ups > 0) setTimeout(() => showLevelUp(), 650);
+    }
+
+    // bono por completar misiones REALES: energía + curación
+    function realMissionBonus(energyGain) {
+        S.combat.energy = Math.min(10, S.combat.energy + energyGain);
+        S.combat.hp = Math.min(maxHp(), S.combat.hp + Math.round(maxHp()*0.05));
+        S.combat.mp = Math.min(maxMp(), S.combat.mp + Math.round(maxMp()*0.05));
+    }
+
+    function updateStreak() {
+        const today = todayStr();
+        if (S.streak.lastDate === today) return;
+        S.streak.count = (S.streak.lastDate === yesterdayStr()) ? S.streak.count + 1 : 1;
+        S.streak.lastDate = today;
+        if (S.streak.count > 1) showToast(`🔥 ¡Racha de <b>${S.streak.count} días</b>! Bono de XP: +${Math.round((streakMult()-1)*100)}%`, '#FF7828');
+    }
+
+    function checkStreakOnLoad() {
+        if (S.streak.lastDate && S.streak.lastDate !== todayStr() && S.streak.lastDate !== yesterdayStr() && S.streak.count > 0) {
+            S.streak.count = 0;
+            showToast('💔 Tu racha se rompió... ¡hoy empieza una nueva!', '#FF4E4E');
+            save();
+        }
+    }
+
+    /* ---------------- ciclo diario (dojo, micro, regeneración) ---------------- */
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function ensureDojo() {
+        const today = todayStr();
+        if (S.dojo && S.dojo.date === today) return;
+        const otherKeys = ['vitalidad','disciplina','carisma','creatividad'];
+        const mk = key => {
+            const lvl = statLvl(key);
+            return { id: uid(), stat: key, name: pick(DOJO_TPL[key])(lvl), xp: 25 + lvl*3, done: false };
+        };
+        S.dojo = { date: today, items: [ mk('fuerza'), mk('inteligencia'), mk(pick(otherKeys)) ] };
+    }
+
+    function ensureMicro() {
+        const today = todayStr();
+        if (S.micro && S.micro.date === today) return;
+        const pool = LIB.filter(m => m.c === 'micro');
+        const items = [];
+        while (items.length < 4) {
+            const m = pick(pool);
+            if (!items.some(x => x.name === m.n)) items.push({ id: uid(), name: m.n, stat: m.s });
+        }
+        S.micro = { date: today, items: items };
+    }
+
+    function dailyTick() {
+        const today = todayStr();
+        if (S.meta.lastSeen !== today) {
+            S.meta.lastSeen = today;
+            S.combat.energy = Math.max(S.combat.energy, 6);
+            S.combat.hp = Math.min(maxHp(), S.combat.hp + Math.round(maxHp()*0.35));
+            S.combat.mp = Math.min(maxMp(), S.combat.mp + Math.round(maxMp()*0.35));
+        }
+        ensureDojo(); ensureMicro();
+        save();
+    }
+
+    /* ---------------- misiones ---------------- */
+    function setTab(tab) {
+        activeTab = tab;
+        const on  = 'pix-btn px-3 py-1.5 text-[9px] bg-[#F5C842] text-black';
+        const off = 'pix-btn px-3 py-1.5 text-[9px] bg-[#151828] text-[#8890B0]';
+        document.getElementById('tab-daily').className = tab==='daily' ? on : off;
+        document.getElementById('tab-quest').className = tab==='quest' ? on : off;
+        renderTasks();
+    }
+
+    function addTask() {
+        const nameEl = document.getElementById('new-task-name');
+        const name = nameEl.value.trim();
+        if (!name) { playSound('error'); nameEl.focus(); return; }
+        const stat = document.getElementById('new-task-stat').value;
+        const diff = document.getElementById('new-task-diff').value;
+        if (activeTab === 'daily') S.dailies.push({ id: uid(), name, stat, diff, doneDate: '' });
+        else S.quests.push({ id: uid(), name, stat, diff, done: false });
+        nameEl.value = '';
+        addLog(`📝 Nueva misión: ${name}`);
+        save(); renderAll();
+        showToast('Misión añadida al tablón ⚔️');
+    }
+
+    function addFromLib(idx, kind) {
+        const m = LIB[idx];
+        if (kind === 'daily') {
+            if (S.dailies.some(t => t.name === m.n)) { showToast('Ya la tienes en diarias', '#FF4E4E'); return; }
+            S.dailies.push({ id: uid(), name: m.n, stat: m.s, diff: m.d, doneDate: '' });
+        } else {
+            if (S.quests.some(t => t.name === m.n && !t.done)) { showToast('Ya la tienes pendiente', '#FF4E4E'); return; }
+            S.quests.push({ id: uid(), name: m.n, stat: m.s, diff: m.d, done: false });
+        }
+        playSound('complete');
+        showToast(`✚ "${m.n}" → ${kind === 'daily' ? 'DIARIAS' : 'ÚNICAS'}`, '#4E9EFF');
+        save(); renderAll();
+    }
+
+    function randomQuest() {
+        const pool = LIB.filter(m => m.c !== 'micro');
+        let tries = 0, m;
+        do { m = pick(pool); tries++; } while (S.quests.some(x => x.name === m.n && !x.done) && tries < 30);
+        S.quests.push({ id: uid(), name: m.n, stat: m.s, diff: m.d, done: false });
+        setTab('quest');
+        addLog(`🎲 Misión sorpresa: ${m.n}`);
+        save(); renderAll();
+        showToast(`🎲 <b>${m.n}</b>`, '#C77DFF');
+        playSound('achievement');
+    }
+
+    function deleteTask(kind, id) {
+        if (!confirm('¿Eliminar esta misión?')) return;
+        if (kind === 'daily') S.dailies = S.dailies.filter(t => t.id !== id);
+        else S.quests = S.quests.filter(t => t.id !== id);
+        save(); renderAll();
+    }
+
+    function completeTask(kind, id, ev) {
+        const list = kind === 'daily' ? S.dailies : S.quests;
+        const t = list.find(x => x.id === id);
+        if (!t) return;
+        const today = todayStr();
+        if (kind === 'daily') { if (t.doneDate === today) return; t.doneDate = today; }
+        else { if (t.done) return; t.done = true; }
+        updateStreak();
+        const d = DIFF[t.diff];
+        const xpGain = Math.round(d.xp * streakMult());
+        const hour = new Date().getHours();
+        if (hour < 8) S.totals.early = true;
+        if (hour >= 22) S.totals.late = true;
+        S.totals.tasksDone++;
+        S.gold += d.gold;
+        realMissionBonus(2);
+        gainXP(xpGain, t.stat);
+        addLog(`✅ ${t.name} — +${xpGain} XP, +${d.gold} 🪙, +2⚡`);
+        floatText(`+${xpGain} XP`, ev);
+        setTimeout(() => floatText(`+2⚡`, {clientX:(ev&&ev.clientX?ev.clientX:innerWidth/2)+70, clientY:ev&&ev.clientY?ev.clientY:innerHeight/2}, '#4EFF8E'), 180);
+        playSound('complete');
+        damageBoss(xpGain);
+        checkAchievements();
+        save(); renderAll();
+    }
+
+    /* ---------------- dojo + micro ---------------- */
+    function completeDojo(id, ev) {
+        const it = S.dojo.items.find(x => x.id === id);
+        if (!it || it.done) return;
+        it.done = true;
+        updateStreak();
+        S.totals.tasksDone++;
+        S.totals.trainingsDone++;
+        S.gold += 8;
+        realMissionBonus(2);
+        gainXP(it.xp, it.stat);
+        addLog(`🥋 Entrenamiento: ${it.name} — +${it.xp} XP ${STATS[it.stat].label}`);
+        floatText(`+${it.xp} ${STATS[it.stat].emoji}`, ev, STATS[it.stat].color);
+        playSound('complete');
+        damageBoss(it.xp);
+        checkAchievements();
+        save(); renderAll();
+    }
+
+    function completeMicro(id, ev) {
+        const idx = S.micro.items.findIndex(x => x.id === id);
+        if (idx === -1) return;
+        const it = S.micro.items[idx];
+        updateStreak();
+        S.totals.tasksDone++;
+        S.totals.microDone++;
+        S.gold += 3;
+        realMissionBonus(1);
+        gainXP(10, it.stat);
+        addLog(`⚡ Rápida: ${it.name} — +10 XP, +1⚡`);
+        floatText('+10 XP', ev, '#4EFF8E');
+        playSound('complete');
+        damageBoss(10);
+        // reemplazar por otra micro distinta
+        const pool = LIB.filter(m => m.c === 'micro' && !S.micro.items.some(x => x.name === m.n));
+        if (pool.length) { const m = pick(pool); S.micro.items[idx] = { id: uid(), name: m.n, stat: m.s }; }
+        else S.micro.items.splice(idx, 1);
+        checkAchievements();
+        save(); renderAll();
+    }
+
+    /* ---------------- jefe de hábitos ---------------- */
+    function damageBoss(dmg) {
+        if (!S.boss || S.boss.hp <= 0) return;
+        S.boss.hp = Math.max(0, S.boss.hp - dmg);
+        const card = document.getElementById('boss-card');
+        card.classList.remove('boss-hit'); void card.offsetWidth; card.classList.add('boss-hit');
+        if (S.boss.hp <= 0) setTimeout(() => bossDefeated(), 500);
+    }
+
+    function bossDefeated() {
+        const goldReward = 150 + S.boss.tier * 50;
+        S.gold += goldReward;
+        S.chests++;
+        S.totals.bossesKilled++;
+        addLog(`👹 ¡Derrotaste a ${S.boss.name}! +${goldReward} 🪙 + 1 cofre`);
+        playSound('defeat');
+        confetti(60);
+        showToast(`👹 ¡<b>${S.boss.name}</b> ha caído! +${goldReward} 🪙 y un cofre 🎁`, '#F5C842');
+        const tier = S.boss.tier + 1;
+        const next = HABIT_BOSSES[(tier - 1) % HABIT_BOSSES.length];
+        S.boss = { name: next.name, emoji: next.emoji, maxHp: Math.round(500 * Math.pow(1.25, tier-1)), hp: 0, tier: tier };
+        S.boss.hp = S.boss.maxHp;
+        checkAchievements();
+        save(); renderAll();
+    }
+
+    /* ---------------- jefes de deuda ---------------- */
+    function addDebt() {
+        const nameEl = document.getElementById('new-debt-name');
+        const totalEl = document.getElementById('new-debt-total');
+        const name = nameEl.value.trim();
+        const total = parseFloat(totalEl.value);
+        if (!name || !total || total <= 0) { playSound('error'); return; }
+        S.debts.push({ id: uid(), name, total, paid: 0 });
+        nameEl.value = ''; totalEl.value = '';
+        addLog(`💳 Nuevo jefe de deuda: ${name} (${fmt(total)})`);
+        save(); renderAll();
+        showToast(`💳 Jefe de deuda invocado: <b>${name}</b>. ¡A por él!`, '#FF4E4E');
+    }
+
+    function attackDebt(id, ev) {
+        const debt = S.debts.find(d => d.id === id);
+        if (!debt || debt.paid >= debt.total) return;
+        const input = document.getElementById('debt-amt-' + id);
+        const amt = parseFloat(input.value);
+        if (!amt || amt <= 0) { playSound('error'); showToast('Escribe el monto que abonaste', '#FF4E4E'); return; }
+        debt.paid = Math.min(debt.total, debt.paid + amt);
+        input.value = '';
+        S.totals.debtAttacks++;
+        S.gold += 15;
+        gainXP(30, 'disciplina');
+        addLog(`💥 Ataque a ${debt.name}: -${fmt(amt)} de deuda`);
+        floatText(`-${fmt(amt)}`, ev, '#FF4E4E');
+        playSound('hit');
+        const card = document.getElementById('debt-card-' + id);
+        if (card) { card.classList.remove('boss-hit'); void card.offsetWidth; card.classList.add('boss-hit'); }
+        if (debt.paid >= debt.total) {
+            S.totals.debtsKilled++;
+            S.gold += 300;
+            S.chests++;
+            addLog(`🕊️ ¡DEUDA ELIMINADA: ${debt.name}! +300 🪙 + 1 cofre`);
+            playSound('victory');
+            confetti(80);
+            showToast(`🕊️ ¡<b>${debt.name}</b> DESTRUIDA! Eres más libre. +300 🪙 + cofre 🎁`, '#4EFF8E');
+        }
+        checkAchievements();
+        save(); renderAll();
+    }
+
+    function deleteDebt(id) {
+        if (!confirm('¿Eliminar este jefe de deuda?')) return;
+        S.debts = S.debts.filter(d => d.id !== id);
+        save(); renderAll();
+    }
+
+    /* ---------------- cofres e inventario ---------------- */
+    function rollItem() {
+        const total = Object.values(RARITY).reduce((a,r)=>a+r.w, 0);
+        let roll = Math.random() * total, rarity = 'común';
+        for (const [name, r] of Object.entries(RARITY)) { roll -= r.w; if (roll <= 0) { rarity = name; break; } }
+        const pool = ITEMS.filter(i => i.r === rarity);
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    function openChest() {
+        if (S.chests <= 0) return null;
+        S.chests--;
+        const item = rollItem();
+        const bonus = RARITY[item.r].gold;
+        S.gold += bonus;
+        S.inventory.push({ n: item.n, e: item.e, r: item.r, date: todayStr() });
+        addLog(`🎁 Cofre: ${item.e} ${item.n} (${item.r}) +${bonus} 🪙`);
+        playSound('chest');
+        confetti(30);
+        checkAchievements();
+        save();
+        return { item, bonus };
+    }
+
+    function openChestFromPanel() {
+        const result = openChest();
+        if (!result) return;
+        const c = RARITY[result.item.r].color;
+        showToast(`🎁 <span class="text-2xl">${result.item.e}</span> <b style="color:${c}">${result.item.n}</b> (${result.item.r}) — +${result.bonus} 🪙`, c);
+        renderAll();
+    }
+
+    /* ---------------- level up ---------------- */
+    function showLevelUp() {
+        const lvl = S.hero.level;
+        const overlay = document.getElementById('levelup-overlay');
+        const content = document.getElementById('levelup-content');
+        content.innerHTML = `
+            <div class="font-px text-[11px] text-[#F5C842] mb-3 blink">★ SUBISTE DE NIVEL ★</div>
+            <div class="levelup-num" style="font-size:clamp(70px,18vw,150px); line-height:1;">${lvl}</div>
+            <div class="mt-4 text-[20px]">Ahora eres <span class="gold text-[#F5C842]">${heroTitle(lvl)}</span> · Rango ${heroRank(lvl)}</div>
+            <div class="text-[16px] text-[#8890B0] mt-1">HP máx: ${maxHp()} · MP máx: ${maxMp()} · ATK: ${atkPower()}</div>
+            <div class="mt-7">
+                <button onclick="openChestInOverlay(this)" class="chest-shake text-6xl bg-transparent border-0 cursor-pointer">🎁</button>
+                <div class="text-[15px] text-[#8890B0] mt-2" id="overlay-chest-label">Toca el cofre (${S.chests} disponible${S.chests===1?'':'s'})</div>
+            </div>
+            <div id="overlay-item" class="mt-5 min-h-[70px]"></div>
+            <button onclick="hideLevelUp()" class="pix-btn mt-5 px-8 py-3 bg-[#151828] text-white text-[10px]">▶ CONTINUAR</button>
+        `;
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        playSound('levelup');
+        confetti(70);
+        renderAll();
+    }
+
+    function openChestInOverlay(btn) {
+        const result = openChest();
+        if (!result) { hideLevelUp(); return; }
+        const c = RARITY[result.item.r].color;
+        document.getElementById('overlay-item').innerHTML = `
+            <div class="item-reveal inline-block pix px-7 py-4" style="border-color:${c}">
+                <div class="text-5xl sprite">${result.item.e}</div>
+                <div class="font-px text-[10px] mt-2" style="color:${c}">${result.item.n}</div>
+                <div class="text-[14px] mt-1" style="color:${c}">${result.item.r} · +${result.bonus} 🪙 · +${RARITY[result.item.r].atk} ATK</div>
+            </div>`;
+        const label = document.getElementById('overlay-chest-label');
+        if (S.chests <= 0) { btn.style.display = 'none'; label.textContent = ''; }
+        else label.textContent = `Toca el cofre (${S.chests} disponible${S.chests===1?'':'s'})`;
+        renderAll();
+    }
+
+    function hideLevelUp() {
+        const overlay = document.getElementById('levelup-overlay');
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+    }
+
+    /* ---------------- tienda ---------------- */
+    function addReward() {
+        const nameEl = document.getElementById('new-reward-name');
+        const costEl = document.getElementById('new-reward-cost');
+        const name = nameEl.value.trim();
+        const cost = parseInt(costEl.value);
+        if (!name || !cost || cost < 1) { playSound('error'); return; }
+        S.rewards.push({ id: uid(), name, cost });
+        nameEl.value = ''; costEl.value = '';
+        save(); renderAll();
+    }
+
+    function buyReward(id, ev) {
+        const r = S.rewards.find(x => x.id === id);
+        if (!r) return;
+        if (S.gold < r.cost) { playSound('error'); showToast(`Te faltan 🪙 ${r.cost - S.gold}. ¡Completa más misiones!`, '#FF4E4E'); return; }
+        S.gold -= r.cost;
+        S.totals.rewardsBought++;
+        addLog(`🛍️ Canjeaste: ${r.name} (-${r.cost} 🪙)`);
+        playSound('gold');
+        floatText(`-${r.cost} 🪙`, ev, '#FF9E4E');
+        showToast(`🎉 ¡Disfruta: <b>${r.name}</b>! Te lo ganaste.`, '#4EFF8E');
+        checkAchievements();
+        save(); renderAll();
+    }
+
+    function deleteReward(id) {
+        if (!confirm('¿Eliminar esta recompensa?')) return;
+        S.rewards = S.rewards.filter(r => r.id !== id);
+        save(); renderAll();
+    }
+
+    function buyConsumable(kind, ev) {
+        const price = kind === 'potion' ? 40 : 35;
+        if (S.gold < price) { playSound('error'); showToast('No te alcanza el oro', '#FF4E4E'); return; }
+        S.gold -= price;
+        if (kind === 'potion') S.combat.potions++;
+        else S.combat.ethers++;
+        playSound('gold');
+        floatText(`-${price} 🪙`, ev, '#FF9E4E');
+        save(); renderAll();
+    }
+
+    function usePotionOutside() {
+        if (S.combat.potions <= 0) { playSound('error'); return; }
+        if (S.combat.hp >= maxHp()) { showToast('HP ya está al máximo', '#4EFF8E'); return; }
+        S.combat.potions--;
+        S.combat.hp = Math.min(maxHp(), S.combat.hp + Math.round(maxHp()*0.5));
+        playSound('chest');
+        showToast('🧪 +50% HP restaurado');
+        save(); renderAll();
+    }
+    function useEtherOutside() {
+        if (S.combat.ethers <= 0) { playSound('error'); return; }
+        if (S.combat.mp >= maxMp()) { showToast('MP ya está al máximo', '#4E9EFF'); return; }
+        S.combat.ethers--;
+        S.combat.mp = Math.min(maxMp(), S.combat.mp + Math.round(maxMp()*0.5));
+        playSound('chest');
+        showToast('💧 +50% MP restaurado');
+        save(); renderAll();
+    }
+
+    /* ---------------- logros + log ---------------- */
+    function checkAchievements() {
+        ACHIEVEMENTS.forEach(a => {
+            if (!S.achievements[a.id] && a.c(S)) {
+                S.achievements[a.id] = todayStr();
+                setTimeout(() => {
+                    playSound('achievement');
+                    showToast(`🏆 ¡Logro! <b>${a.icon} ${a.n}</b>`, '#F5C842');
+                    confetti(24);
+                }, 400);
+            }
+        });
+    }
+
+    function addLog(text) {
+        const now = new Date();
+        const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        S.log.unshift({ d: todayStr(), t: time, text });
+        if (S.log.length > 50) S.log.length = 50;
+    }
+
+    /* ================================================================
+       MAZMORRA — combate por turnos
+       ================================================================ */
+    function isBossFloor(f) { return f % 5 === 0; }
+    function killsNeeded(f) { return isBossFloor(f) ? 1 : 3; }
+
+    function makeEnemy(floor) {
+        if (isBossFloor(floor)) {
+            const b = DUNGEON_BOSSES[(Math.floor(floor/5) - 1) % DUNGEON_BOSSES.length];
+            return {
+                name: b.n, emoji: b.e, isBoss: true,
+                maxHp: Math.round(28 * (1 + 0.4*(floor-1)) * 2.6),
+                hp: 0,
+                atk: Math.round((5 + 2.2*(floor-1)) * 1.5),
+                xp: (12 + 5*floor) * 3,
+                gold: (8 + 4*floor) * 3,
+                frozen: false,
+            };
+        }
+        const lo = Math.max(0, floor - 3), hi = Math.min(ENEMIES.length, floor + 2);
+        const base = pick(ENEMIES.slice(lo, hi));
+        return {
+            name: base.n, emoji: base.e, isBoss: false,
+            maxHp: Math.round(28 * (1 + 0.4*(floor-1)) * (0.85 + Math.random()*0.3)),
+            hp: 0,
+            atk: Math.round(5 + 2.2*(floor-1)),
+            xp: 12 + 5*floor,
+            gold: 8 + 4*floor,
+            frozen: false,
+        };
+    }
+
+    function startBattle() {
+        if (B && !B.over) return;
+        if (S.combat.energy < 1) {
+            playSound('error');
+            showToast('⚡ Sin energía. Completa misiones REALES para recargar (+2⚡ cada una)', '#FF4E4E');
+            return;
+        }
+        if (S.combat.hp <= 0) S.combat.hp = 1;
+        if (S.combat.hp < maxHp() * 0.15 && !confirm('Tu HP está muy bajo. ¿Entrar igual a la mazmorra?')) return;
+        S.combat.energy--;
+        const enemy = makeEnemy(S.dungeon.floor);
+        enemy.hp = enemy.maxHp;
+        B = { enemy, busy: false, over: false, log: [] };
+        btLog(enemy.isBoss ? `☠️ ¡JEFE DEL PISO ${S.dungeon.floor}! ${enemy.name} bloquea tu camino...` : `Un ${enemy.name} salvaje aparece...`);
+        const m = document.getElementById('battle-modal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        playSound('hit');
+        save();
+        renderBattle();
+        renderAll();
+    }
+
+    function btLog(text) {
+        B.log.push(text);
+        if (B.log.length > 30) B.log.shift();
+        const el = document.getElementById('bt-log');
+        el.innerHTML = B.log.map(l => `<div>${l}</div>`).join('');
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function enemyHitFx() {
+        const el = document.getElementById('bt-enemy-emoji');
+        el.classList.remove('enemy-hit'); void el.offsetWidth; el.classList.add('enemy-hit');
+    }
+    function playerHitFx() {
+        const el = document.getElementById('battle-box');
+        el.classList.remove('player-hit'); void el.offsetWidth; el.classList.add('player-hit');
+    }
+
+    function variance(n) { return Math.max(1, Math.round(n * (0.85 + Math.random()*0.3))); }
+
+    function playerAttack() {
+        if (B.busy || B.over) return;
+        B.busy = true;
+        let dmg = variance(atkPower());
+        let crit = Math.random()*100 < critPct();
+        if (crit) dmg = Math.round(dmg * 2);
+        B.enemy.hp = Math.max(0, B.enemy.hp - dmg);
+        btLog(`⚔️ Golpeas al ${B.enemy.name}: <b class="text-[#F5C842]">-${dmg}</b>${crit ? ' <span class="text-[#FF9E4E]">¡CRÍTICO!</span>' : ''}`);
+        enemyHitFx(); playSound('hit');
+        afterPlayerAction();
+    }
+
+    function castSpell(spellId) {
+        if (B.busy || B.over) return;
+        const sp = SPELLS.find(x => x.id === spellId);
+        if (!sp || S.combat.mp < sp.mp) { playSound('error'); return; }
+        B.busy = true;
+        S.combat.mp -= sp.mp;
+        S.totals.spellsCast++;
+        if (sp.type === 'heal') {
+            const heal = Math.round(maxHp() * sp.healPct);
+            S.combat.hp = Math.min(maxHp(), S.combat.hp + heal);
+            btLog(`${sp.emoji} ${sp.name}: recuperas <b class="text-[#4EFF8E]">+${heal} HP</b>`);
+            playSound('magic');
+        } else {
+            let dmg = variance(magPower() * sp.mult);
+            let crit = Math.random()*100 < critPct();
+            if (crit) dmg = Math.round(dmg * 2);
+            B.enemy.hp = Math.max(0, B.enemy.hp - dmg);
+            if (sp.freeze && Math.random() < sp.freeze && B.enemy.hp > 0) {
+                B.enemy.frozen = true;
+                btLog(`${sp.emoji} ${sp.name}: <b class="text-[#F5C842]">-${dmg}</b> ¡y el enemigo queda CONGELADO! ❄️`);
+            } else {
+                btLog(`${sp.emoji} ${sp.name}: <b class="text-[#F5C842]">-${dmg}</b>${crit ? ' <span class="text-[#FF9E4E]">¡CRÍTICO!</span>' : ''}`);
+            }
+            enemyHitFx(); playSound('magic');
+        }
+        checkAchievements();
+        afterPlayerAction();
+    }
+
+    function battlePotion() {
+        if (B.busy || B.over) return;
+        if (S.combat.potions <= 0) { playSound('error'); return; }
+        B.busy = true;
+        S.combat.potions--;
+        const heal = Math.round(maxHp() * 0.5);
+        S.combat.hp = Math.min(maxHp(), S.combat.hp + heal);
+        btLog(`🧪 Poción: <b class="text-[#4EFF8E]">+${heal} HP</b>`);
+        playSound('chest');
+        afterPlayerAction();
+    }
+
+    function battleEther() {
+        if (B.busy || B.over) return;
+        if (S.combat.ethers <= 0) { playSound('error'); return; }
+        B.busy = true;
+        S.combat.ethers--;
+        const rec = Math.round(maxMp() * 0.5);
+        S.combat.mp = Math.min(maxMp(), S.combat.mp + rec);
+        btLog(`💧 Éter: <b class="text-[#4E9EFF]">+${rec} MP</b>`);
+        playSound('chest');
+        afterPlayerAction();
+    }
+
+    function tryFlee() {
+        if (B.busy || B.over) return;
+        B.busy = true;
+        if (Math.random() < 0.7) {
+            btLog('🏃 ¡Escapas del combate!');
+            B.over = true;
+            setTimeout(() => closeBattle(), 700);
+            save(); renderBattle();
+        } else {
+            btLog('🏃 ¡No logras escapar!');
+            setTimeout(() => enemyTurn(), 700);
+        }
+    }
+
+    function afterPlayerAction() {
+        save(); renderBattle();
+        if (B.enemy.hp <= 0) { setTimeout(() => battleWon(), 600); return; }
+        if (B.enemy.frozen) {
+            B.enemy.frozen = false;
+            btLog(`❄️ El ${B.enemy.name} está congelado y pierde su turno`);
+            B.busy = false;
+            renderBattle();
+            return;
+        }
+        setTimeout(() => enemyTurn(), 800);
+    }
+
+    function enemyTurn() {
+        if (B.over) return;
+        if (Math.random() < 0.08) {
+            btLog(`💨 El ${B.enemy.name} falla su ataque`);
+        } else {
+            let dmg = Math.max(1, variance(B.enemy.atk) - defPower());
+            S.combat.hp = Math.max(0, S.combat.hp - dmg);
+            btLog(`💢 El ${B.enemy.name} te golpea: <b class="text-[#FF4E4E]">-${dmg}</b> <span class="text-[#8890B0]">(DEF -${defPower()})</span>`);
+            playerHitFx(); playSound('playerhit');
+        }
+        save(); renderBattle();
+        if (S.combat.hp <= 0) { setTimeout(() => battleLost(), 600); return; }
+        B.busy = false;
+        renderBattle();
+    }
+
+    function battleWon() {
+        B.over = true;
+        const goldGain = Math.round(B.enemy.gold * goldMult());
+        S.gold += goldGain;
+        S.totals.battlesWon++;
+        S.dungeon.kills++;
+        let advance = false;
+        if (S.dungeon.kills >= killsNeeded(S.dungeon.floor)) {
+            S.dungeon.floor++;
+            S.dungeon.kills = 0;
+            S.dungeon.bestFloor = Math.max(S.dungeon.bestFloor, S.dungeon.floor);
+            advance = true;
+        }
+        let dropTxt = '';
+        if (B.enemy.isBoss) {
+            S.chests++;
+            S.combat.potions++;
+            dropTxt = '🎁 ¡Cofre + 🧪 Poción!';
+        } else {
+            if (Math.random() < 0.20) { S.combat.potions++; dropTxt = '🧪 ¡Soltó una poción!'; }
+            else if (Math.random() < 0.15) { S.combat.ethers++; dropTxt = '💧 ¡Soltó un éter!'; }
+        }
+        addLog(`⚔️ Venciste a ${B.enemy.name} (piso ${advance ? S.dungeon.floor-1 : S.dungeon.floor}) +${B.enemy.xp} XP +${goldGain} 🪙`);
+        gainXP(B.enemy.xp, null);
+        playSound('victory');
+        confetti(B.enemy.isBoss ? 60 : 20);
+        checkAchievements();
+        save();
+        renderBattle();
+        document.getElementById('bt-actions').innerHTML = `
+            <div class="text-center py-1">
+                <div class="font-px text-[12px] text-[#4EFF8E]">★ ¡VICTORIA! ★</div>
+                <div class="text-[16px] mt-2">+${B.enemy.xp} XP · +${goldGain} 🪙 ${dropTxt ? '· ' + dropTxt : ''}</div>
+                ${advance ? `<div class="text-[16px] text-[#C77DFF] mt-1 blink">▼ ¡Bajas al piso ${S.dungeon.floor}! ▼</div>` : ''}
+                <div class="flex gap-2 mt-3">
+                    <button onclick="closeBattle(); startBattle()" class="pix-btn flex-1 py-2.5 bg-[#C77DFF] text-black text-[9px]" ${S.combat.energy<1?'disabled':''}>⚔️ SIGUIENTE (1⚡)</button>
+                    <button onclick="closeBattle()" class="pix-btn flex-1 py-2.5 bg-[#151828] text-white text-[9px]">SALIR</button>
+                </div>
+            </div>`;
+        renderAll();
+    }
+
+    function battleLost() {
+        B.over = true;
+        const lost = Math.round(S.gold * 0.10);
+        S.gold -= lost;
+        S.combat.hp = 1;
+        addLog(`💀 Derrotado por ${B.enemy.name}... -${lost} 🪙`);
+        playSound('defeat');
+        save();
+        renderBattle();
+        document.getElementById('bt-actions').innerHTML = `
+            <div class="text-center py-1">
+                <div class="font-px text-[12px] text-[#FF4E4E]">✖ DERROTA ✖</div>
+                <div class="text-[16px] mt-2">Despiertas en la entrada... pierdes ${lost} 🪙</div>
+                <div class="text-[14px] text-[#8890B0] mt-1">Completa misiones reales para recuperar HP (+5% c/u) o usa una poción</div>
+                <button onclick="closeBattle()" class="pix-btn w-full mt-3 py-2.5 bg-[#151828] text-white text-[9px]">VOLVER AL PUEBLO</button>
+            </div>`;
+        renderAll();
+    }
+
+    function closeBattle() {
+        const m = document.getElementById('battle-modal');
+        m.classList.add('hidden'); m.classList.remove('flex');
+        B = null;
+        renderAll();
+    }
+
+    function renderBattle() {
+        if (!B) return;
+        document.getElementById('bt-floor').textContent = S.dungeon.floor;
+        document.getElementById('bt-energy').textContent = S.combat.energy;
+        document.getElementById('bt-enemy-emoji').textContent = B.enemy.emoji;
+        document.getElementById('bt-enemy-name').innerHTML =
+            (B.enemy.isBoss ? '☠️ ' : '') + B.enemy.name + ' <span class="text-[#8890B0]">Nv.' + S.dungeon.floor + '</span>' + (B.enemy.frozen ? ' ❄️' : '');
+        document.getElementById('bt-enemy-hpbar').style.width = (B.enemy.hp / B.enemy.maxHp * 100) + '%';
+        document.getElementById('bt-enemy-hptext').textContent = B.enemy.hp + '/' + B.enemy.maxHp;
+        document.getElementById('bt-player-avatar').textContent = S.hero.avatar;
+        document.getElementById('bt-player-hpbar').style.width = Math.max(0, S.combat.hp / maxHp() * 100) + '%';
+        document.getElementById('bt-player-hptext').textContent = S.combat.hp + '/' + maxHp();
+        document.getElementById('bt-player-mpbar').style.width = Math.max(0, S.combat.mp / maxMp() * 100) + '%';
+        document.getElementById('bt-player-mptext').textContent = S.combat.mp + '/' + maxMp();
+        if (B.over) return;
+        const dis = B.busy ? 'disabled' : '';
+        document.getElementById('bt-actions').innerHTML = `
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="playerAttack()" ${dis} class="pix-btn py-2.5 bg-[#FF4E4E] text-black text-[9px]">⚔️ ATACAR (${atkPower()})</button>
+                <button onclick="toggleSpellMenu()" ${dis} class="pix-btn py-2.5 bg-[#4E9EFF] text-black text-[9px]">✨ HECHIZOS</button>
+                <button onclick="battlePotion()" ${dis || (S.combat.potions<=0?'disabled':'')} class="pix-btn py-2.5 bg-[#1E2338] text-[#4EFF8E] text-[9px]">🧪 POCIÓN x${S.combat.potions}</button>
+                <button onclick="tryFlee()" ${dis} class="pix-btn py-2.5 bg-[#1E2338] text-[#8890B0] text-[9px]">🏃 HUIR</button>
+            </div>
+            <div id="bt-spell-menu" class="hidden mt-2 space-y-1.5"></div>`;
+    }
+
+    function toggleSpellMenu() {
+        const menu = document.getElementById('bt-spell-menu');
+        if (!menu) return;
+        if (!menu.classList.contains('hidden')) { menu.classList.add('hidden'); return; }
+        const spells = knownSpells();
+        const intLvl = statLvl('inteligencia');
+        const nextSpell = SPELLS.find(sp => sp.intReq > intLvl);
+        menu.innerHTML = spells.map(sp => {
+            const can = S.combat.mp >= sp.mp;
+            const effect = sp.type === 'heal' ? `cura ${Math.round(maxHp()*sp.healPct)} HP` : `~${Math.round(magPower()*sp.mult)} daño`;
+            return `<button onclick="castSpell('${sp.id}')" ${can?'':'disabled'}
+                class="pix-btn w-full py-2 bg-[#0A0C17] text-left px-3 text-[15px] font-['VT323'] flex justify-between ${can?'text-white':'text-[#8890B0]'}">
+                <span>${sp.emoji} ${sp.name} <span class="text-[#8890B0]">(${effect})</span></span>
+                <span class="text-[#4E9EFF]">${sp.mp} MP</span></button>`;
+        }).join('') +
+        (nextSpell ? `<div class="text-[13px] text-[#8890B0] text-center pt-1">🔒 ${nextSpell.emoji} ${nextSpell.name} se desbloquea con Inteligencia Nv.${nextSpell.intReq}</div>` : '');
+        menu.classList.remove('hidden');
+    }
+
+    /* ================================================================
+       RENDER
+       ================================================================ */
+    function renderAll() {
+        renderHeader(); renderStats(); renderDungeonCard(); renderBoss(); renderDebts();
+        renderTasks(); renderDojo(); renderMicro(); renderShop(); renderInventory();
+        renderAchievements(); renderLog();
+    }
+
+    function renderHeader() {
+        document.getElementById('hud-avatar').textContent = S.hero.avatar;
+        document.getElementById('hud-name').textContent = S.hero.name;
+        document.getElementById('hud-title').textContent = heroTitle(S.hero.level) + ' · ' + S.hero.class;
+        document.getElementById('hud-level').textContent = S.hero.level;
+        document.getElementById('hud-rank').textContent = heroRank(S.hero.level);
+        const need = xpNeeded(S.hero.level);
+        document.getElementById('hud-xpbar').style.width = Math.min(100, S.hero.xp / need * 100) + '%';
+        document.getElementById('hud-xptext').textContent = S.hero.xp + '/' + need;
+        document.getElementById('hud-hpbar').style.width = Math.max(0, S.combat.hp / maxHp() * 100) + '%';
+        document.getElementById('hud-mpbar').style.width = Math.max(0, S.combat.mp / maxMp() * 100) + '%';
+        document.getElementById('hud-gold').textContent = fmt(S.gold);
+        document.getElementById('hud-streak').textContent = S.streak.count;
+        document.getElementById('hud-energy').textContent = S.combat.energy;
+        const doneToday = S.dailies.filter(t => t.doneDate === todayStr()).length;
+        document.getElementById('hud-today').textContent = doneToday + '/' + S.dailies.length;
+        renderSoundIcon();
+    }
+
+    function renderStats() {
+        document.getElementById('stats-list').innerHTML = Object.entries(STATS).map(([key, st]) => {
+            const xp = S.stats[key] ? S.stats[key].xp : 0;
+            const lvl = Math.floor(xp / 100) + 1;
+            return `
+            <div>
+                <div class="flex justify-between items-center text-[16px] mb-1">
+                    <span>${st.emoji} ${st.label}</span>
+                    <span class="text-[#8890B0]">Nv.<b class="text-white">${lvl}</b></span>
+                </div>
+                <div class="pix-bar thin"><div class="pix-fill" style="width:${xp % 100}%; background-color:${st.color}"></div></div>
+            </div>`;
+        }).join('');
+        document.getElementById('combat-stats').innerHTML = `
+            <div class="pix-dark py-1.5"><div class="text-[#FF4E4E]">⚔️ ${atkPower()}</div><div class="text-[12px] text-[#8890B0]">ATAQUE</div></div>
+            <div class="pix-dark py-1.5"><div class="text-[#4E9EFF]">✨ ${magPower()}</div><div class="text-[12px] text-[#8890B0]">MAGIA</div></div>
+            <div class="pix-dark py-1.5"><div class="text-[#F5C842]">🛡️ ${defPower()}</div><div class="text-[12px] text-[#8890B0]">DEFENSA</div></div>
+            <div class="pix-dark py-1.5"><div class="text-[#4EFF8E]">❤️ ${maxHp()}</div><div class="text-[12px] text-[#8890B0]">HP MÁX</div></div>
+            <div class="pix-dark py-1.5"><div class="text-[#C77DFF]">🔮 ${maxMp()}</div><div class="text-[12px] text-[#8890B0]">MP MÁX</div></div>
+            <div class="pix-dark py-1.5"><div class="text-[#FF9E4E]">💥 ${critPct()}%</div><div class="text-[12px] text-[#8890B0]">CRÍTICO</div></div>`;
+    }
+
+    function renderDungeonCard() {
+        const f = S.dungeon.floor;
+        document.getElementById('dg-floor').textContent = f;
+        document.getElementById('dg-best').textContent = S.dungeon.bestFloor;
+        const boss = isBossFloor(f);
+        const preview = boss ? DUNGEON_BOSSES[(Math.floor(f/5)-1) % DUNGEON_BOSSES.length] : null;
+        document.getElementById('dg-enemy-preview').textContent = boss ? preview.e : '❓';
+        document.getElementById('dg-enemy-name').textContent = boss ? '☠️ JEFE: ' + preview.n : 'Enemigos del piso ' + f;
+        document.getElementById('dg-kills').textContent = boss
+            ? '¡Derrota al jefe para avanzar!'
+            : `Victorias en este piso: ${S.dungeon.kills}/${killsNeeded(f)}`;
+        document.getElementById('pl-hpbar').style.width = Math.max(0, S.combat.hp / maxHp() * 100) + '%';
+        document.getElementById('pl-hptext').textContent = S.combat.hp + '/' + maxHp();
+        document.getElementById('pl-mpbar').style.width = Math.max(0, S.combat.mp / maxMp() * 100) + '%';
+        document.getElementById('pl-mptext').textContent = S.combat.mp + '/' + maxMp();
+        document.getElementById('btn-potion-out').textContent = '🧪 x' + S.combat.potions;
+        document.getElementById('btn-ether-out').textContent = '💧 x' + S.combat.ethers;
+        const enter = document.getElementById('dg-enter');
+        enter.disabled = S.combat.energy < 1;
+        enter.textContent = S.combat.energy < 1 ? '⚡ SIN ENERGÍA' : '⚔️ ENTRAR (1⚡)';
+    }
+
+    function renderBoss() {
+        document.getElementById('boss-name').textContent = S.boss.name + (S.boss.tier > 1 ? ' · Nv.' + S.boss.tier : '');
+        document.getElementById('boss-emoji').textContent = S.boss.emoji;
+        document.getElementById('boss-hpbar').style.width = (S.boss.hp / S.boss.maxHp * 100) + '%';
+        document.getElementById('boss-hptext').textContent = fmt(S.boss.hp) + '/' + fmt(S.boss.maxHp);
+        document.getElementById('boss-reward').textContent = `🪙 ${150 + S.boss.tier*50} + 1 cofre`;
+    }
+
+    function renderDebts() {
+        const el = document.getElementById('debt-list');
+        if (S.debts.length === 0) {
+            el.innerHTML = `<div class="text-[15px] text-[#8890B0] text-center py-3">Sin deudas registradas. Si tienes alguna (tarjeta, préstamo), invócala como jefe y destrúyela abono a abono 💪</div>`;
+            return;
+        }
+        el.innerHTML = S.debts.map(d => {
+            const remaining = d.total - d.paid;
+            const pct = Math.max(0, remaining / d.total * 100);
+            const dead = remaining <= 0;
+            return `
+            <div class="pix-dark p-3.5" id="debt-card-${d.id}">
+                <div class="flex items-center gap-x-3">
+                    <div class="text-3xl sprite ${dead ? '' : 'sprite-bob'}">${dead ? '🕊️' : '💳'}</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-baseline gap-2">
+                            <span class="font-px text-[10px] truncate ${dead ? 'line-through text-[#8890B0]' : ''}">${d.name}</span>
+                            <button onclick="deleteDebt('${d.id}')" class="text-[#8890B0]/60 hover:text-red-400 text-[13px]">✕</button>
+                        </div>
+                        <div class="flex items-center gap-x-2 mt-1.5">
+                            <div class="pix-bar flex-1"><div class="pix-fill" style="width:${pct}%; background-color:${dead?'#4EFF8E':'#FF4E4E'}"></div></div>
+                            <span class="text-[14px] ${dead?'text-[#4EFF8E]':'text-red-400'} whitespace-nowrap">${dead ? '¡DERROTADA!' : fmt(remaining)}</span>
+                        </div>
+                        ${dead ? '' : `
+                        <div class="flex gap-2 mt-2">
+                            <input id="debt-amt-${d.id}" type="number" min="1" placeholder="Monto abonado"
+                                   class="flex-1 bg-black/40 border-2 border-white/15 px-2 py-1 text-[15px] w-full">
+                            <button onclick="attackDebt('${d.id}', event)" class="pix-btn px-3 bg-[#FF4E4E] text-black text-[8px]">💥 ATACAR</button>
+                        </div>`}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderTasks() {
+        const el = document.getElementById('task-list');
+        const today = todayStr();
+        const isDaily = activeTab === 'daily';
+        let list = isDaily
+            ? S.dailies.slice().sort((a,b) => (a.doneDate===today) - (b.doneDate===today))
+            : S.quests.slice().sort((a,b) => a.done - b.done);
+        if (list.length === 0) {
+            el.innerHTML = `<div class="text-center text-[16px] text-[#8890B0] py-6">Vacío por aquí...<br>Abre la 📚 BIBLIOTECA o pide una 🎲 SORPRESA</div>`;
+            return;
+        }
+        el.innerHTML = list.map(t => {
+            const done = isDaily ? t.doneDate === today : t.done;
+            const d = DIFF[t.diff], st = STATS[t.stat];
+            const kind = isDaily ? 'daily' : 'quest';
+            return `
+            <div class="flex items-center gap-x-3 pix-dark px-3 py-2.5 ${done?'task-done':''}">
+                <button onclick="completeTask('${kind}','${t.id}',event)"
+                        class="pix-btn w-8 h-8 flex-shrink-0 ${done ? 'bg-[#4EFF8E] text-black' : 'bg-[#151828] text-[#8890B0] hover:text-[#F5C842]'} text-[11px]">✓</button>
+                <div class="flex-1 min-w-0">
+                    <div class="task-name text-[17px] truncate">${t.name}</div>
+                    <div class="text-[13px] text-[#8890B0]">${st.emoji} ${st.label}</div>
+                </div>
+                <div class="text-[13px] px-2 py-0.5 border-2 whitespace-nowrap" style="color:${d.color}; border-color:${d.color}66">${d.xp} XP</div>
+                <button onclick="deleteTask('${kind}','${t.id}')" class="text-[#8890B0]/50 hover:text-red-400 px-1 text-[14px]">✕</button>
+            </div>`;
+        }).join('');
+    }
+
+    function renderDojo() {
+        document.getElementById('dojo-list').innerHTML = S.dojo.items.map(it => {
+            const st = STATS[it.stat];
+            return `
+            <div class="flex items-center gap-x-3 pix-dark px-3 py-2.5 ${it.done?'task-done':''}">
+                <button onclick="completeDojo('${it.id}',event)"
+                        class="pix-btn w-8 h-8 flex-shrink-0 ${it.done ? 'bg-[#4EFF8E] text-black' : 'bg-[#151828] text-[#8890B0] hover:text-[#4EFF8E]'} text-[11px]">✓</button>
+                <div class="flex-1 min-w-0">
+                    <div class="task-name text-[17px]">${it.name}</div>
+                    <div class="text-[13px]" style="color:${st.color}">${st.emoji} +${it.xp} XP ${st.label}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderMicro() {
+        document.getElementById('micro-list').innerHTML = S.micro.items.map(it => {
+            const st = STATS[it.stat];
+            return `
+            <div class="flex items-center gap-x-3 pix-dark px-3 py-2">
+                <button onclick="completeMicro('${it.id}',event)"
+                        class="pix-btn w-7 h-7 flex-shrink-0 bg-[#151828] text-[#8890B0] hover:text-[#F5C842] text-[10px]">✓</button>
+                <div class="flex-1 min-w-0 text-[16px] truncate">${it.name}</div>
+                <span class="text-[14px]">${st.emoji}</span>
+            </div>`;
+        }).join('');
+    }
+
+    function renderShop() {
+        document.getElementById('shop-consumables').innerHTML = `
+            <div class="flex items-center gap-x-2 pix-dark px-3 py-2">
+                <span class="text-xl">🧪</span>
+                <div class="flex-1 text-[16px]">Poción <span class="text-[#8890B0]">(+50% HP) — tienes ${S.combat.potions}</span></div>
+                <button onclick="buyConsumable('potion',event)" class="pix-btn px-2.5 py-1 ${S.gold>=40?'bg-[#F5C842] text-black':'bg-[#1E2338] text-[#8890B0]'} text-[9px]">🪙 40</button>
+            </div>
+            <div class="flex items-center gap-x-2 pix-dark px-3 py-2">
+                <span class="text-xl">💧</span>
+                <div class="flex-1 text-[16px]">Éter <span class="text-[#8890B0]">(+50% MP) — tienes ${S.combat.ethers}</span></div>
+                <button onclick="buyConsumable('ether',event)" class="pix-btn px-2.5 py-1 ${S.gold>=35?'bg-[#F5C842] text-black':'bg-[#1E2338] text-[#8890B0]'} text-[9px]">🪙 35</button>
+            </div>`;
+        const el = document.getElementById('shop-list');
+        if (S.rewards.length === 0) {
+            el.innerHTML = `<div class="text-[15px] text-[#8890B0] text-center py-2">Añade premios reales que te motiven 👇</div>`;
+            return;
+        }
+        el.innerHTML = S.rewards.map(r => `
+            <div class="flex items-center gap-x-2 pix-dark px-3 py-2">
+                <div class="flex-1 text-[17px] truncate">${r.name}</div>
+                <button onclick="buyReward('${r.id}',event)"
+                        class="pix-btn px-2.5 py-1 text-[9px] whitespace-nowrap ${S.gold >= r.cost ? 'bg-[#F5C842] text-black' : 'bg-[#1E2338] text-[#8890B0]'}">🪙 ${r.cost}</button>
+                <button onclick="deleteReward('${r.id}')" class="text-[#8890B0]/50 hover:text-red-400 px-1 text-[14px]">✕</button>
+            </div>`).join('');
+    }
+
+    function renderInventory() {
+        const btn = document.getElementById('chest-btn');
+        if (S.chests > 0) { btn.classList.remove('hidden'); document.getElementById('chest-count').textContent = S.chests; }
+        else btn.classList.add('hidden');
+        document.getElementById('inv-bonus').textContent = S.inventory.length
+            ? `Bonus de equipo: +${itemAtk()} ATK (${S.inventory.length} objetos)` : 'Los objetos de los cofres dan bonus de ATK';
+        const el = document.getElementById('inventory-list');
+        if (S.inventory.length === 0) {
+            el.innerHTML = `<div class="text-[15px] text-[#8890B0]">Sube de nivel o vence jefes para ganar cofres 🎁</div>`;
+            return;
+        }
+        el.innerHTML = S.inventory.map(i => {
+            const c = RARITY[i.r].color;
+            return `<div class="flex items-center gap-x-1.5 px-2 py-1 border-2 text-[14px]" style="border-color:${c}66; background:${c}11" title="${i.n} (${i.r}) · +${RARITY[i.r].atk} ATK · ${i.date}">
+                <span class="text-lg sprite">${i.e}</span><span style="color:${c}" class="hidden sm:inline">${i.n}</span>
+            </div>`;
+        }).join('');
+    }
+
+    function renderAchievements() {
+        const unlocked = Object.keys(S.achievements).length;
+        document.getElementById('ach-count').textContent = unlocked + '/' + ACHIEVEMENTS.length;
+        document.getElementById('achievements-list').innerHTML = ACHIEVEMENTS.map(a => {
+            const got = !!S.achievements[a.id];
+            return `<div class="aspect-square border-2 flex items-center justify-center text-xl cursor-help ${got ? 'border-[#F5C842]/60 bg-[#F5C842]/10' : 'border-white/10 bg-black/20 grayscale opacity-35'}"
+                        title="${a.n} — ${a.d}${got ? ' ✓ ('+S.achievements[a.id]+')' : ''}">${a.icon}</div>`;
+        }).join('');
+    }
+
+    function renderLog() {
+        const el = document.getElementById('log-list');
+        el.innerHTML = S.log.length
+            ? S.log.map(l => `<div><span class="text-[#8890B0]/60">${l.d} ${l.t}</span> · ${l.text}</div>`).join('')
+            : '<div class="py-2">Tu historia comienza hoy...</div>';
+    }
+
+    /* ---------------- biblioteca ---------------- */
+    function showLibrary() {
+        renderLibCats();
+        renderLibrary();
+        const m = document.getElementById('library-modal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+    }
+    function hideLibrary() {
+        const m = document.getElementById('library-modal');
+        m.classList.add('hidden'); m.classList.remove('flex');
+    }
+    function setLibCat(c) { libCat = c; renderLibCats(); renderLibrary(); }
+    function renderLibCats() {
+        document.getElementById('lib-cats').innerHTML = Object.entries(CATS).map(([k, c]) =>
+            `<button onclick="setLibCat('${k}')" class="pix-btn px-2 py-1 text-[8px] ${libCat===k ? 'bg-[#4E9EFF] text-black' : 'bg-[#151828] text-[#8890B0]'}">${c.e} ${c.label.toUpperCase()}</button>`
+        ).join('');
+    }
+    function renderLibrary() {
+        const q = (document.getElementById('lib-search').value || '').toLowerCase();
+        const rows = LIB.map((m, i) => ({ m, i }))
+            .filter(({m}) => (libCat === 'todas' || m.c === libCat) && (!q || m.n.toLowerCase().includes(q)));
+        document.getElementById('lib-list').innerHTML = rows.length ? rows.map(({m, i}) => {
+            const d = DIFF[m.d], st = STATS[m.s];
+            return `
+            <div class="flex items-center gap-x-2 pix-dark px-3 py-2">
+                <span class="text-[15px]">${st.emoji}</span>
+                <div class="flex-1 min-w-0 text-[16px] truncate">${m.n}</div>
+                <span class="text-[12px] px-1.5 border-2 whitespace-nowrap" style="color:${d.color}; border-color:${d.color}66">${d.xp}XP</span>
+                <button onclick="addFromLib(${i},'quest')" class="pix-btn px-2 py-1 bg-[#4E9EFF] text-black text-[8px]" title="Añadir como misión única">+ÚNICA</button>
+                <button onclick="addFromLib(${i},'daily')" class="pix-btn px-2 py-1 bg-[#F5C842] text-black text-[8px]" title="Añadir como misión diaria">+DIARIA</button>
+            </div>`;
+        }).join('') : `<div class="text-center text-[16px] text-[#8890B0] py-6">Nada por aquí con ese filtro</div>`;
+    }
+
+    /* ---------------- onboarding ---------------- */
+    function renderOnboard() {
+        document.getElementById('onboard-avatars').innerHTML = AVATARS.map(a =>
+            `<button onclick="pickAvatar('${a}')" class="aspect-square border-2 ${a===onboardAvatar?'border-[#F5C842] bg-[#F5C842]/10':'border-white/15 hover:border-white/40'} text-2xl sprite">${a}</button>`
+        ).join('');
+        document.getElementById('onboard-classes').innerHTML = CLASSES.map(c =>
+            `<button onclick="pickClass('${c.id}')" class="text-left p-3 border-2 ${c.id===onboardClass?'border-[#F5C842] bg-[#F5C842]/10':'border-white/15 hover:border-white/40'}">
+                <div class="text-[17px]">${c.emoji} ${c.name}</div>
+                <div class="text-[13px] text-[#8890B0]">${c.desc}</div>
+            </button>`
+        ).join('');
+    }
+    function pickAvatar(a) { onboardAvatar = a; renderOnboard(); }
+    function pickClass(id) { onboardClass = id; renderOnboard(); }
+
+    function createHero() {
+        const name = document.getElementById('onboard-name').value.trim() || 'Héroe Sin Nombre';
+        S = defaultState(name, onboardAvatar, onboardClass);
+        S.combat.hp = maxHp(); S.combat.mp = maxMp();
+        addLog(`⚔️ ${name} comienza su aventura como ${S.hero.class}`);
+        dailyTick();
+        save();
+        const m = document.getElementById('onboard-modal');
+        m.classList.add('hidden'); m.classList.remove('flex');
+        renderAll();
+        playSound('levelup');
+        confetti(50);
+        showToast(`⚔️ ¡Bienvenido, <b>${name}</b>! Completa misiones reales para ganar XP y ⚡ para la mazmorra.`, '#F5C842');
+    }
+
+    /* ---------------- ajustes ---------------- */
+    function showSettings() {
+        settingsAvatar = S.hero.avatar;
+        document.getElementById('settings-name').value = S.hero.name;
+        renderSettingsAvatars();
+        const m = document.getElementById('settings-modal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+    }
+    function renderSettingsAvatars() {
+        document.getElementById('settings-avatars').innerHTML = AVATARS.map(a =>
+            `<button onclick="settingsAvatar='${a}';renderSettingsAvatars()" class="aspect-square border-2 ${a===settingsAvatar?'border-[#F5C842] bg-[#F5C842]/10':'border-white/15 hover:border-white/40'} text-2xl sprite">${a}</button>`
+        ).join('');
+    }
+    function hideSettings() {
+        const m = document.getElementById('settings-modal');
+        m.classList.add('hidden'); m.classList.remove('flex');
+    }
+    function saveSettings() {
+        const name = document.getElementById('settings-name').value.trim();
+        if (name) S.hero.name = name;
+        S.hero.avatar = settingsAvatar;
+        save(); renderAll(); hideSettings();
+        showToast('Héroe actualizado ✨');
+    }
+
+    function exportSave() {
+        const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'vida-rpg-respaldo-' + todayStr() + '.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast('💾 Respaldo descargado');
+    }
+
+    function importSave(ev) {
+        const file = ev.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (!data.hero || !data.stats) throw new Error('formato inválido');
+                S = migrate(data);
+                dailyTick();
+                save(); renderAll(); hideSettings();
+                showToast('✅ Partida importada con éxito');
+            } catch(err) {
+                showToast('❌ Ese archivo no parece un respaldo válido', '#FF4E4E');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function resetGame() {
+        if (!confirm('⚠️ Esto borra TODO tu progreso. ¿Seguro?')) return;
+        if (!confirm('Última oportunidad: ¿de verdad quieres empezar de cero?')) return;
+        localStorage.removeItem(SAVE_KEY);
+        location.reload();
+    }
+
+    /* ---------------- init ---------------- */
+    function fillSelects() {
+        document.getElementById('new-task-stat').innerHTML =
+            Object.entries(STATS).map(([k,s]) => `<option value="${k}">${s.emoji} ${s.label}</option>`).join('');
+        document.getElementById('new-task-diff').innerHTML =
+            Object.entries(DIFF).map(([k,d]) => `<option value="${k}">${d.label} (${d.xp} XP)</option>`).join('');
+    }
+
+    window.onload = function() {
+        fillSelects();
+        load();
+        if (!S) {
+            renderOnboard();
+            const m = document.getElementById('onboard-modal');
+            m.classList.remove('hidden'); m.classList.add('flex');
+        } else {
+            checkStreakOnLoad();
+            dailyTick();
+            renderAll();
+        }
+    };
+    </script>
+    </script>
+</body>
+</html>
